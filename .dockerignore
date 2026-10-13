@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+**/.next
+**/dist
+.git
+.idea
+.local
+.env
+.env.test
+.env.*.local
+.pnpm-store
+.turbo
+playwright-report
+test-results

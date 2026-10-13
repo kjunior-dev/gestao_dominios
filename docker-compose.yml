@@ -1,0 +1,124 @@
+name: devtrust-domains
+x-app: &app
+  build:
+    context: .
+    dockerfile: infrastructure/docker/Dockerfile
+    target: development
+  env_file: .env
+  environment: &app-env
+    NODE_ENV: development
+    DATABASE_URL: postgresql://devtrust:${POSTGRES_PASSWORD:-devtrust_local}@postgres:5432/devtrust
+    REDIS_URL: redis://redis:6379
+    APP_URL: ${APP_URL:-http://localhost:3000}
+    API_INTERNAL_URL: http://api:4000
+    API_PORT: 4000
+    WEB_PORT: 3000
+    DEV_MAILBOX_DIR: /app/.local/mailbox
+  init: true
+  volumes:
+    - ./apps:/app/apps
+    - ./packages:/app/packages
+    - web_modules:/app/apps/web/node_modules
+    - api_modules:/app/apps/api/node_modules
+    - worker_modules:/app/apps/worker/node_modules
+    - database_modules:/app/packages/database/node_modules
+    - contracts_modules:/app/packages/contracts/node_modules
+    - ui_modules:/app/packages/ui/node_modules
+    - mailbox:/app/.local/mailbox
+  networks: [backend, edge]
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: devtrust
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devtrust_local}
+      POSTGRES_DB: devtrust
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    ports: ['127.0.0.1:5432:5432']
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U devtrust -d devtrust]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, 'yes', --maxmemory-policy, noeviction]
+    volumes: [redis_data:/data]
+    ports: ['127.0.0.1:6379:6379']
+    networks: [backend]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  migrate:
+    <<: *app
+    command:
+      [
+        sh,
+        -c,
+        'pnpm --filter @devtrust/contracts build && pnpm --filter @devtrust/database build && pnpm --filter @devtrust/database migrate',
+      ]
+    depends_on:
+      postgres: { condition: service_healthy }
+  api:
+    <<: *app
+    command: [pnpm, --filter, '@devtrust/api', dev]
+    ports: ['127.0.0.1:${API_PORT:-4000}:4000']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://localhost:4000/api/openapi.json').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  worker:
+    <<: *app
+    command: [pnpm, --filter, '@devtrust/worker', dev]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, pnpm, --filter, '@devtrust/worker', exec, tsx, src/health.ts]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  web:
+    <<: *app
+    command: [pnpm, --filter, '@devtrust/web', dev]
+    ports: ['${WEB_PORT:-3000}:3000']
+    depends_on:
+      api: { condition: service_healthy }
+      worker: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+volumes:
+  postgres_data:
+  redis_data:
+  mailbox:
+  web_modules:
+  api_modules:
+  worker_modules:
+  database_modules:
+  contracts_modules:
+  ui_modules:
+networks:
+  backend: { internal: true }
+  edge:

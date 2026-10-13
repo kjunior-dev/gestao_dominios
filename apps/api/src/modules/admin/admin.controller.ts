@@ -1,21 +1,206 @@
+import { ApiPagination } from '../../common/openapi';
 import { Inject } from '@nestjs/common';
-import {Controller,Get,Patch,Post,Param,Query,Body,Req,ParseUUIDPipe,ForbiddenException} from '@nestjs/common';
-import {ApiTags,ApiBody} from '@nestjs/swagger';
-import {z} from 'zod';
-import {paginationSchema,adminUserSchema} from '@devtrust/contracts';
-import {DatabaseService} from '../../common/database.service';
-import {AuthRequest,RequirePermission} from '../../common/security';
-import {SchemaPipe} from '../../common/validation.pipe';
-import {AuditService} from '../audit/audit.service';
-import {publicSelect} from '../auth/auth.service';
-import {NotificationsService} from '../notifications/notifications.service';
-@ApiTags('Administration') @Controller('admin') export class AdminController {
- constructor(@Inject(DatabaseService) private db:DatabaseService,@Inject(AuditService) private audit:AuditService,@Inject(NotificationsService) private notifications:NotificationsService){}
- @RequirePermission('users.read') @Get('stats') async stats(){const [users,organizations]=await Promise.all([this.db.user.count(),this.db.organization.count()]);return {users,organizations};}
- @RequirePermission('users.read') @Get('users') async users(@Query(new SchemaPipe(paginationSchema)) q:z.infer<typeof paginationSchema>){const where={...(q.status?{status:q.status}:{}),OR:[{email:{contains:q.search,mode:'insensitive' as const}},{firstName:{contains:q.search,mode:'insensitive' as const}},{lastName:{contains:q.search,mode:'insensitive' as const}}]};const [items,total]=await this.db.$transaction([this.db.user.findMany({where,select:publicSelect,skip:(q.page-1)*q.pageSize,take:q.pageSize,orderBy:{createdAt:'desc'}}),this.db.user.count({where})]);return {items,total,page:q.page,pageSize:q.pageSize};}
- @RequirePermission('organizations.read') @Get('organizations') async organizations(@Query(new SchemaPipe(paginationSchema)) q:z.infer<typeof paginationSchema>){const where={...(q.status?{status:q.status}:{}),name:{contains:q.search,mode:'insensitive' as const}};const [items,total]=await this.db.$transaction([this.db.organization.findMany({where,skip:(q.page-1)*q.pageSize,take:q.pageSize,orderBy:{createdAt:'desc'}}),this.db.organization.count({where})]);return {items,total,page:q.page,pageSize:q.pageSize};}
- @RequirePermission('audit.read') @Get('audit-logs') async logs(@Query(new SchemaPipe(paginationSchema)) q:z.infer<typeof paginationSchema>){const where={action:{contains:q.search,mode:'insensitive' as const}};const [items,total]=await this.db.$transaction([this.db.auditLog.findMany({where,skip:(q.page-1)*q.pageSize,take:q.pageSize,orderBy:{createdAt:'desc'}}),this.db.auditLog.count({where})]);return {items,total,page:q.page,pageSize:q.pageSize};}
- @RequirePermission('users.update') @Patch('users/:id') @ApiBody({schema:{type:'object',properties:{status:{type:'string',enum:['ACTIVE','SUSPENDED']},globalRole:{type:'string',enum:['ADMIN','SUPPORT','CUSTOMER']}}}}) async update(@Req() req:AuthRequest,@Param('id',ParseUUIDPipe) id:string,@Body(new SchemaPipe(adminUserSchema)) body:z.infer<typeof adminUserSchema>){return this.db.$transaction(async tx=>{const target=await tx.user.findUniqueOrThrow({where:{id}});if(id===req.user.id || target.globalRole==='SUPER_ADMIN')throw new ForbiddenException('Não pode alterar este utilizador');if(body.globalRole && req.user.globalRole!=='SUPER_ADMIN')throw new ForbiddenException('Só SUPER_ADMIN gere papéis globais');const result=await tx.user.update({where:{id},data:body,select:publicSelect});await tx.session.updateMany({where:{userId:id,revokedAt:null},data:{revokedAt:new Date()}});await this.audit.record('admin.user_updated','User',req.user.id,id,undefined,{...body,previousRole:target.globalRole,previousStatus:target.status},tx);return result;});}
- @RequirePermission('organizations.update') @Patch('organizations/:id') @ApiBody({schema:{type:'object',required:['status'],properties:{status:{type:'string',enum:['ACTIVE','SUSPENDED']}}}}) async updateOrganization(@Req() req:AuthRequest,@Param('id',ParseUUIDPipe) id:string,@Body(new SchemaPipe(z.object({status:z.enum(['ACTIVE','SUSPENDED'])}).strict())) body:{status:'ACTIVE'|'SUSPENDED'}){return this.db.$transaction(async tx=>{const result=await tx.organization.update({where:{id},data:body});await this.audit.record('admin.organization_updated','Organization',req.user.id,id,id,body,tx);return result;});}
- @RequirePermission('system.manage') @Post('notifications/demo') async demo(@Req() req:AuthRequest){const result=await this.notifications.enqueue(req.user.id,'DEMO','Notificação demonstrativa');await this.audit.record('admin.notification_demo','Notification',req.user.id,result.id);return {id:result.id,status:result.status};}
+import {
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Param,
+  Query,
+  Body,
+  Req,
+  ParseUUIDPipe,
+  ForbiddenException,
+} from '@nestjs/common';
+import { ApiTags, ApiBody } from '@nestjs/swagger';
+import { z } from 'zod/v3';
+import { paginationSchema, adminUserSchema } from '@devtrust/contracts';
+import { DatabaseService } from '../../common/database.service';
+import { AuthRequest, RequirePermission } from '../../common/security';
+import { SchemaPipe } from '../../common/validation.pipe';
+import { AuditService } from '../audit/audit.service';
+import { publicSelect } from '../auth/auth.service';
+import { NotificationsService } from '../notifications/notifications.service';
+@ApiTags('Administration')
+@Controller('admin')
+export class AdminController {
+  constructor(
+    @Inject(DatabaseService) private db: DatabaseService,
+    @Inject(AuditService) private audit: AuditService,
+    @Inject(NotificationsService) private notifications: NotificationsService,
+  ) {}
+  @RequirePermission('users.read') @Get('stats') async stats() {
+    const [users, organizations] = await Promise.all([
+      this.db.user.count(),
+      this.db.organization.count(),
+    ]);
+    return { users, organizations };
+  }
+  @RequirePermission('users.read') @Get('users') @ApiPagination() async users(
+    @Query(new SchemaPipe(paginationSchema))
+    q: z.infer<typeof paginationSchema>,
+  ) {
+    const where = {
+      ...(q.status ? { status: q.status } : {}),
+      OR: [
+        { email: { contains: q.search, mode: 'insensitive' as const } },
+        { firstName: { contains: q.search, mode: 'insensitive' as const } },
+        { lastName: { contains: q.search, mode: 'insensitive' as const } },
+      ],
+    };
+    const [items, total] = await this.db.$transaction([
+      this.db.user.findMany({
+        where,
+        select: publicSelect,
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.user.count({ where }),
+    ]);
+    return { items, total, page: q.page, pageSize: q.pageSize };
+  }
+  @RequirePermission('organizations.read')
+  @Get('organizations')
+  @ApiPagination()
+  async organizations(
+    @Query(new SchemaPipe(paginationSchema))
+    q: z.infer<typeof paginationSchema>,
+  ) {
+    const where = {
+      ...(q.status ? { status: q.status } : {}),
+      name: { contains: q.search, mode: 'insensitive' as const },
+    };
+    const [items, total] = await this.db.$transaction([
+      this.db.organization.findMany({
+        where,
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.organization.count({ where }),
+    ]);
+    return { items, total, page: q.page, pageSize: q.pageSize };
+  }
+  @RequirePermission('audit.read')
+  @Get('audit-logs')
+  @ApiPagination()
+  async logs(
+    @Query(new SchemaPipe(paginationSchema))
+    q: z.infer<typeof paginationSchema>,
+  ) {
+    const where = {
+      action: { contains: q.search, mode: 'insensitive' as const },
+    };
+    const [items, total] = await this.db.$transaction([
+      this.db.auditLog.findMany({
+        where,
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.auditLog.count({ where }),
+    ]);
+    return { items, total, page: q.page, pageSize: q.pageSize };
+  }
+  @RequirePermission('users.update')
+  @Patch('users/:id')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['ACTIVE', 'SUSPENDED'] },
+        globalRole: { type: 'string', enum: ['ADMIN', 'SUPPORT', 'CUSTOMER'] },
+      },
+    },
+  })
+  async update(
+    @Req() req: AuthRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new SchemaPipe(adminUserSchema))
+    body: z.infer<typeof adminUserSchema>,
+  ) {
+    return this.db.$transaction(async (tx) => {
+      const target = await tx.user.findUniqueOrThrow({ where: { id } });
+      if (id === req.user.id || target.globalRole === 'SUPER_ADMIN')
+        throw new ForbiddenException('Não pode alterar este utilizador');
+      if (body.globalRole && req.user.globalRole !== 'SUPER_ADMIN')
+        throw new ForbiddenException('Só SUPER_ADMIN gere papéis globais');
+      const result = await tx.user.update({
+        where: { id },
+        data: body,
+        select: publicSelect,
+      });
+      await tx.session.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await this.audit.record(
+        'admin.user_updated',
+        'User',
+        req.user.id,
+        id,
+        undefined,
+        {
+          ...body,
+          previousRole: target.globalRole,
+          previousStatus: target.status,
+        },
+        tx,
+      );
+      return result;
+    });
+  }
+  @RequirePermission('organizations.update')
+  @Patch('organizations/:id')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['status'],
+      properties: { status: { type: 'string', enum: ['ACTIVE', 'SUSPENDED'] } },
+    },
+  })
+  async updateOrganization(
+    @Req() req: AuthRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(
+      new SchemaPipe(
+        z.object({ status: z.enum(['ACTIVE', 'SUSPENDED']) }).strict(),
+      ),
+    )
+    body: { status: 'ACTIVE' | 'SUSPENDED' },
+  ) {
+    return this.db.$transaction(async (tx) => {
+      const result = await tx.organization.update({
+        where: { id },
+        data: body,
+      });
+      await this.audit.record(
+        'admin.organization_updated',
+        'Organization',
+        req.user.id,
+        id,
+        id,
+        body,
+        tx,
+      );
+      return result;
+    });
+  }
+  @RequirePermission('system.manage') @Post('notifications/demo') async demo(
+    @Req() req: AuthRequest,
+  ) {
+    const result = await this.notifications.enqueue(
+      req.user.id,
+      'DEMO',
+      'Notificação demonstrativa',
+    );
+    await this.audit.record(
+      'admin.notification_demo',
+      'Notification',
+      req.user.id,
+      result.id,
+    );
+    return { id: result.id, status: result.status };
+  }
 }

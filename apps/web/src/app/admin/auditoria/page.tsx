@@ -1,2 +1,4 @@
-import {AdminList} from '@/features/admin/admin-list';
-export default function Page(){return <AdminList kind="audit-logs"/>;}
+import { AdminList } from '@/features/admin/admin-list';
+export default function Page() {
+  return <AdminList kind="audit-logs" />;
+}

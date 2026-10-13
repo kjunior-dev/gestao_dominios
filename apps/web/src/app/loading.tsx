@@ -1,2 +1,2 @@
-import {LoadingState} from '@devtrust/ui';
+import { LoadingState } from '@devtrust/ui';
 export default LoadingState;

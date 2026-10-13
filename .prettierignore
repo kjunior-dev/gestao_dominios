@@ -8,3 +8,11 @@ pnpm-lock.yaml
 package-lock.json
 .idea
 coverage
+
+# Next.js reformats its TypeScript config when adding generated route types.
+apps/web/tsconfig.json
+
+.local/
+.turbo/
+test-results/
+playwright-report/

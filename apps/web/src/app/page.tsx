@@ -1,6 +1,185 @@
 import Link from 'next/link';
-import {ArrowRight,ShieldCheck,Globe2,Headphones,Layers3,CheckCircle2,LockKeyhole,Building2,Users} from 'lucide-react';
-import {Button,Card,Badge} from '@devtrust/ui';
-import {PublicShell} from '@/components/public-shell';
-import {DomainSearch} from '@/features/domains/domain-search';
-export default function Home(){return <PublicShell><main><section className="hero"><div className="container"><span className="eyebrow"><Globe2 size={14}/> De Cabo Verde para o mundo</span><h1>A sua próxima grande ideia<br/>merece um <span>domínio.</span></h1><p>Uma presença digital começa com confiança. Prepare o seu espaço online e gira a sua organização num só lugar.</p><DomainSearch/><div className="extensions">{['.com','.cv','.net','.org','.io'].map(t=><div key={t} className="extension">{t}<small>EM BREVE</small></div>)}</div></div></section><div className="container trust-strip"><span><ShieldCheck size={16}/> Segurança desde o primeiro dia</span><span><Globe2 size={16}/> Construído em Cabo Verde</span><span><CheckCircle2 size={16}/> Gestão simples e transparente</span></div><section id="vantagens" className="section container"><div className="section-title"><Badge>O SEU PARCEIRO DIGITAL</Badge><h2 className="section-gap">Menos complexidade.<br/>Mais espaço para crescer.</h2><p>Uma plataforma pensada para pessoas e empresas que querem construir uma presença digital sólida.</p></div><div className="grid-3">{[{icon:ShieldCheck,title:'Confiança em cada acesso',text:'Sessões seguras, proteção multifator e controlo de permissões para manter a sua conta protegida.'},{icon:Layers3,title:'Tudo no seu lugar',text:'Organize a sua equipa e as informações da empresa num painel claro, pronto para acompanhar o seu crescimento.'},{icon:Headphones,title:'Proximidade que faz a diferença',text:'Uma empresa cabo-verdiana, com uma visão global e foco nas necessidades do seu negócio.'}].map(f=><Card key={f.title}><span className="feature-icon"><f.icon size={23}/></span><h3>{f.title}</h3><p>{f.text}</p></Card>)}</div></section><section className="container"><div className="service-banner"><div><Badge>UMA BASE PARA O FUTURO</Badge><h2 className="section-gap">Da primeira ideia<br/>à sua presença digital.</h2><p>Comece por criar a sua conta e preparar a organização. Os serviços de domínios chegarão nas próximas fases.</p><Button asChild><Link href="/registar">Começar agora <ArrowRight size={16}/></Link></Button></div><div className="service-list"><div><Users/><span><strong>Conta e equipa</strong><p>Disponível · Perfis, membros e permissões</p></span></div><div><Building2/><span><strong>Organizações</strong><p>Disponível · Gestão de dados da empresa</p></span></div><div><Globe2/><span><strong>Domínios e DNS</strong><p>Em preparação · Sem operações comerciais nesta fase</p></span></div></div></div></section><section className="section container"><div className="section-title"><h2>Vamos esclarecer.</h2><p>O que precisa de saber antes de começar.</p></div><div className="faq">{[['Já posso comprar um domínio?','Ainda não. Nesta fase pode criar uma conta, proteger o acesso e gerir a sua organização. A pesquisa e compra serão disponibilizadas posteriormente.'],['Posso gerir uma conta com a minha equipa?','Sim. Os proprietários podem associar utilizadores registados e atribuir papéis de OWNER, MANAGER ou MEMBER.'],['Como é protegida a minha conta?','Utilizamos passwords protegidas com Argon2id, sessões revogáveis e autenticação multifator. O MFA é obrigatório para administradores.'],['Existem preços comerciais disponíveis?','Os preços serão publicados após a integração com os fornecedores. Não existem cobranças ou preços ativos nesta fase.']].map(([q,a])=><details key={q}><summary>{q}</summary><p>{a}</p></details>)}</div></section><section className="container section"><div className="cta"><h2>O primeiro passo é seu.</h2><p>Crie a sua conta e prepare o futuro da sua presença online.</p><Button asChild><Link href="/registar">Criar a minha conta <LockKeyhole size={16}/></Link></Button></div></section></main></PublicShell>;}
+import {
+  ArrowRight,
+  ShieldCheck,
+  Globe2,
+  Headphones,
+  Layers3,
+  CheckCircle2,
+  LockKeyhole,
+  Building2,
+  Users,
+} from 'lucide-react';
+import { Button, Card, Badge } from '@devtrust/ui';
+import { PublicShell } from '@/components/public-shell';
+import { DomainSearch } from '@/features/domains/domain-search';
+export default function Home() {
+  return (
+    <PublicShell>
+      <main>
+        <section className="hero">
+          <div className="container">
+            <span className="eyebrow">
+              <Globe2 size={14} /> De Cabo Verde para o mundo
+            </span>
+            <h1>
+              A sua próxima grande ideia
+              <br />
+              merece um <span>domínio.</span>
+            </h1>
+            <p>
+              Uma presença digital começa com confiança. Prepare o seu espaço
+              online e gira a sua organização num só lugar.
+            </p>
+            <DomainSearch />
+            <div className="extensions">
+              {['.com', '.cv', '.net', '.org', '.io'].map((t) => (
+                <div key={t} className="extension">
+                  {t}
+                  <small>EM BREVE</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+        <div className="container trust-strip">
+          <span>
+            <ShieldCheck size={16} /> Segurança desde o primeiro dia
+          </span>
+          <span>
+            <Globe2 size={16} /> Construído em Cabo Verde
+          </span>
+          <span>
+            <CheckCircle2 size={16} /> Gestão simples e transparente
+          </span>
+        </div>
+        <section id="vantagens" className="section container">
+          <div className="section-title">
+            <Badge>O SEU PARCEIRO DIGITAL</Badge>
+            <h2 className="section-gap">
+              Menos complexidade.
+              <br />
+              Mais espaço para crescer.
+            </h2>
+            <p>
+              Uma plataforma pensada para pessoas e empresas que querem
+              construir uma presença digital sólida.
+            </p>
+          </div>
+          <div className="grid-3">
+            {[
+              {
+                icon: ShieldCheck,
+                title: 'Confiança em cada acesso',
+                text: 'Sessões seguras, proteção multifator e controlo de permissões para manter a sua conta protegida.',
+              },
+              {
+                icon: Layers3,
+                title: 'Tudo no seu lugar',
+                text: 'Organize a sua equipa e as informações da empresa num painel claro, pronto para acompanhar o seu crescimento.',
+              },
+              {
+                icon: Headphones,
+                title: 'Proximidade que faz a diferença',
+                text: 'Uma empresa cabo-verdiana, com uma visão global e foco nas necessidades do seu negócio.',
+              },
+            ].map((f) => (
+              <Card key={f.title}>
+                <span className="feature-icon">
+                  <f.icon size={23} />
+                </span>
+                <h3>{f.title}</h3>
+                <p>{f.text}</p>
+              </Card>
+            ))}
+          </div>
+        </section>
+        <section className="container">
+          <div className="service-banner">
+            <div>
+              <Badge>UMA BASE PARA O FUTURO</Badge>
+              <h2 className="section-gap">
+                Da primeira ideia
+                <br />à sua presença digital.
+              </h2>
+              <p>
+                Comece por criar a sua conta e preparar a organização. Os
+                serviços de domínios chegarão nas próximas fases.
+              </p>
+              <Button asChild>
+                <Link href="/registar">
+                  Começar agora <ArrowRight size={16} />
+                </Link>
+              </Button>
+            </div>
+            <div className="service-list">
+              <div>
+                <Users />
+                <span>
+                  <strong>Conta e equipa</strong>
+                  <p>Disponível · Perfis, membros e permissões</p>
+                </span>
+              </div>
+              <div>
+                <Building2 />
+                <span>
+                  <strong>Organizações</strong>
+                  <p>Disponível · Gestão de dados da empresa</p>
+                </span>
+              </div>
+              <div>
+                <Globe2 />
+                <span>
+                  <strong>Domínios e DNS</strong>
+                  <p>Em preparação · Sem operações comerciais nesta fase</p>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section className="section container">
+          <div className="section-title">
+            <h2>Vamos esclarecer.</h2>
+            <p>O que precisa de saber antes de começar.</p>
+          </div>
+          <div className="faq">
+            {[
+              [
+                'Já posso comprar um domínio?',
+                'Ainda não. Nesta fase pode criar uma conta, proteger o acesso e gerir a sua organização. A pesquisa e compra serão disponibilizadas posteriormente.',
+              ],
+              [
+                'Posso gerir uma conta com a minha equipa?',
+                'Sim. Os proprietários podem associar utilizadores registados e atribuir papéis de OWNER, MANAGER ou MEMBER.',
+              ],
+              [
+                'Como é protegida a minha conta?',
+                'Utilizamos passwords protegidas com Argon2id, sessões revogáveis e autenticação multifator. O MFA é obrigatório para administradores.',
+              ],
+              [
+                'Existem preços comerciais disponíveis?',
+                'Os preços serão publicados após a integração com os fornecedores. Não existem cobranças ou preços ativos nesta fase.',
+              ],
+            ].map(([q, a]) => (
+              <details key={q}>
+                <summary>{q}</summary>
+                <p>{a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+        <section className="container section">
+          <div className="cta">
+            <h2>O primeiro passo é seu.</h2>
+            <p>Crie a sua conta e prepare o futuro da sua presença online.</p>
+            <Button asChild>
+              <Link href="/registar">
+                Criar a minha conta <LockKeyhole size={16} />
+              </Link>
+            </Button>
+          </div>
+        </section>
+      </main>
+    </PublicShell>
+  );
+}

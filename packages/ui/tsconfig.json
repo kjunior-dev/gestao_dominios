@@ -1,0 +1,9 @@
+{
+  "extends": "../config/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "declaration": false
+  },
+  "include": ["src"]
+}
