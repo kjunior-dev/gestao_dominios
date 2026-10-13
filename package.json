@@ -1,26 +1,38 @@
 {
-  "name": "gestao_dominios",
-  "version": "0.1.0",
+  "name": "devtrust-domains",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.2",
+  "engines": {
+    "node": ">=22.14.0 <23"
   },
-  "dependencies": {
-    "next": "16.4.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
+  "scripts": {
+    "dev": "dotenv -e .env -- turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "vitest run",
+    "test:integration": "dotenv -e .env.test -- vitest run --config vitest.integration.config.ts",
+    "test:e2e": "dotenv -e .env.test -- playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @devtrust/database generate",
+    "db:migrate": "dotenv -e .env -- pnpm --filter @devtrust/database migrate",
+    "db:seed": "dotenv -e .env -- pnpm --filter @devtrust/database seed",
+    "admin:bootstrap": "dotenv -e .env -- pnpm --filter @devtrust/database bootstrap"
   },
   "devDependencies": {
-    "@tailwindcss/turbopack": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.0",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5.9.3",
+    "@types/node": "^22.14.0",
+    "tsx": "^4.20.6",
+    "turbo": "^2.5.8",
+    "dotenv-cli": "^8.0.0",
+    "prettier": "^3.6.2",
+    "eslint": "^9.39.0",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^3.2.4",
+    "@playwright/test": "^1.56.0",
+    "supertest": "^7.1.4",
+    "@types/supertest": "^6.0.3"
   }
 }

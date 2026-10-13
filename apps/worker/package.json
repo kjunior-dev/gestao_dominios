@@ -1,0 +1,26 @@
+{
+  "name": "@devtrust/worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@devtrust/contracts": "workspace:*",
+    "@devtrust/database": "workspace:*",
+    "bullmq": "^5.61.2",
+    "ioredis": "^5.8.1",
+    "pino": "^9.14.0",
+    "zod": "^3.25.76",
+    "dotenv": "^16.6.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^22.14.0",
+    "tsx": "^4.20.6"
+  }
+}

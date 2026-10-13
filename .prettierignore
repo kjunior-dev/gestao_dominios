@@ -1,0 +1,10 @@
+node_modules
+.pnpm-store
+.next
+**/.next
+**/dist
+**/generated
+pnpm-lock.yaml
+package-lock.json
+.idea
+coverage
