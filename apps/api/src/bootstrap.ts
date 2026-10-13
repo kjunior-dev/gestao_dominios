@@ -51,6 +51,22 @@ export async function createApp() {
           path === '/api/v1/health' || publicPaths.has(path)
             ? []
             : [{ cookie: [] }];
+      if (
+        operation &&
+        ['post', 'patch', 'delete'].includes(method) &&
+        !publicPaths.has(path)
+      ) {
+        operation.parameters = [
+          ...(operation.parameters || []),
+          {
+            name: 'X-CSRF-Token',
+            in: 'header',
+            required: true,
+            description: 'Valor do cookie dt_csrf associado à sessão.',
+            schema: { type: 'string' },
+          },
+        ];
+      }
     }
   }
   SwaggerModule.setup('api/docs', app, document, {

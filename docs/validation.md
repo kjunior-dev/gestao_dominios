@@ -15,7 +15,7 @@ Validação local em 13 de outubro de 2026, macOS, Node 22.14.0 e pnpm 9.15.2. P
 | `pnpm format:check`                                                    | Passou                                                                                          |
 | `pnpm build`                                                           | Passou: API, worker, pacotes e Next.js com Webpack/PostCSS                                      |
 | `pnpm test`                                                            | 6 testes unitários passaram                                                                     |
-| `pnpm test:integration`                                                | 33 testes de integração passaram                                                                |
+| `pnpm test:integration`                                                | 35 testes de integração passaram                                                                |
 | `pnpm test:e2e`                                                        | 6 testes Chromium passaram                                                                      |
 | `pnpm audit --prod --audit-level moderate`                             | Nenhuma vulnerabilidade conhecida encontrada                                                    |
 | `pnpm dev` completo                                                    | API, worker e Next iniciaram; health retornou database/redis/worker `ok`                        |
@@ -25,15 +25,15 @@ Validação local em 13 de outubro de 2026, macOS, Node 22.14.0 e pnpm 9.15.2. P
 | Pesquisa de segredos locais em ficheiros versionáveis                  | Nenhuma ocorrência dos valores secretos gerados localmente                                      |
 | YAML Compose                                                           | Parse e referências entre serviços validados; rede interna e portas coerentes                   |
 
-Total: **45 testes automatizados passaram**. Os testes usaram exclusivamente `devtrust_test` e Redis DB 1. E2E também recusa arrancar sem NODE_ENV=test, nome de base terminado em `_test` e Redis DB 1.
+Total: **47 testes automatizados passaram**. Os testes usaram exclusivamente `devtrust_test` e Redis DB 1. E2E também recusa arrancar sem NODE_ENV=test, nome de base terminado em `_test` e Redis DB 1.
 
 ## Cenários de integração
 
-Registo e email duplicado; Argon2id; credenciais corretas/incorretas e bloqueio; Origin/CSRF; logout, logout-all e revogação individual/estrangeira; sessões expiradas/revogadas; confirmação de email, token expirado/usado; recuperação uniforme, token de reset expirado/usado e invalidação de sessões; alteração de password; bootstrap; OpenAPI; health completo; criação transacional e integridade relacional; isolamento de organização; escalada de privilégios; gestão OWNER, proibição MEMBER e preservação do último OWNER; MFA cifrada, códigos de recuperação hashed, login TOTP, anti replay e recovery code de uso único; paginação/contagens reais/auditoria; alterações administrativas autorizadas e revogação de sessões; processamento BullMQ, duplicados, retry/backoff e falhas persistidas em PostgreSQL.
+Registo e email duplicado; Argon2id; credenciais corretas/incorretas e bloqueio; Origin/CSRF; logout, logout-all e revogação individual/estrangeira; sessões expiradas/revogadas; confirmação de email, token expirado/usado; recuperação uniforme, token de reset expirado/usado e invalidação de sessões; alteração de password; bootstrap; OpenAPI; health completo; criação transacional e integridade relacional; isolamento de organização; escalada de privilégios; gestão OWNER, proibição MEMBER e remoção/revogação de acesso de membros e preservação do último OWNER; MFA cifrada, códigos de recuperação hashed, login TOTP, anti replay e recovery code de uso único; paginação/contagens reais/auditoria; alterações administrativas autorizadas e revogação de sessões; processamento BullMQ, duplicados, retry/backoff e falhas persistidas em PostgreSQL.
 
 ## Cenários end-to-end
 
-Homepage, pesquisa honesta sem disponibilidade inventada, light/dark, responsividade; redirecionamentos anónimos; registo/login/perfil/organização/logout; bloqueio de cliente em admin; erros claros; confirmação e recuperação através dos links reais com fragmentos escritos pelo worker na caixa local; enrollment MFA pela interface administrativa e consulta real de utilizadores/auditoria.
+Homepage, pesquisa honesta sem disponibilidade inventada, light/dark, responsividade; redirecionamentos anónimos; registo/login/perfil/organização/logout; bloqueio de cliente em admin; erros claros; confirmação e recuperação através dos links reais com fragmentos escritos pelo worker na caixa local; enrollment MFA pela interface administrativa e consulta real de utilizadores/auditoria e erro de confirmação ao tentar remover o último OWNER.
 
 ## Limitações de execução
 

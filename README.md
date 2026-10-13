@@ -25,6 +25,7 @@ Pré-requisitos: Node na versão de `.nvmrc`, pnpm 9.15.2, PostgreSQL 17 e Redis
 
 ```bash
 cp .env.example .env
+chmod 600 .env
 # Gere TOTP_ENCRYPTION_KEY e coloque o resultado em .env:
 openssl rand -hex 32
 # Defina também uma SEED_PASSWORD de desenvolvimento com 12+ caracteres.

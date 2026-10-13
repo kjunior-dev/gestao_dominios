@@ -3,8 +3,8 @@ import { hash, argon2id } from 'argon2';
 const db = new PrismaClient();
 async function main() {
   const password = process.env.SEED_PASSWORD;
-  if (!password || password.length < 12)
-    throw new Error('Set SEED_PASSWORD with at least 12 characters.');
+  if (!password || password.length < 12 || password.length > 128)
+    throw new Error('Set SEED_PASSWORD with 12–128 characters.');
   const user = await db.user.upsert({
     where: { email: 'cliente@example.test' },
     update: {},

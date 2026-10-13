@@ -250,14 +250,26 @@ export function ConfirmDialog({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false),
-    [busy, setBusy] = React.useState(false);
+    [busy, setBusy] = React.useState(false),
+    [error, setError] = React.useState('');
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
+      <Button
+        variant="secondary"
+        onClick={() => {
+          setError('');
+          setOpen(true);
+        }}
+      >
         {children}
       </Button>
       <Modal open={open} onOpenChange={setOpen} title={title}>
         <p>{description}</p>
+        {error && (
+          <p className="field-error" role="alert">
+            {error}
+          </p>
+        )}
         <div className="actions">
           <Button variant="secondary" onClick={() => setOpen(false)}>
             Cancelar
@@ -266,9 +278,16 @@ export function ConfirmDialog({
             disabled={busy}
             onClick={async () => {
               setBusy(true);
+              setError('');
               try {
                 await onConfirm();
                 setOpen(false);
+              } catch (e) {
+                setError(
+                  e instanceof Error
+                    ? e.message
+                    : 'Não foi possível concluir o pedido',
+                );
               } finally {
                 setBusy(false);
               }

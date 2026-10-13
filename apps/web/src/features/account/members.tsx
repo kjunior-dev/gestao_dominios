@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Member } from '@devtrust/contracts';
 import { memberSchema } from '@devtrust/contracts';
 import { useForm } from 'react-hook-form';
@@ -16,15 +16,30 @@ import {
   FormField,
   LoadingState,
   EmptyState,
+  ConfirmDialog,
 } from '@devtrust/ui';
 import { toast } from 'sonner';
 import { useAccount } from '@/hooks/account-context';
-import { api, mutate } from '@/lib/api';
+import { api, mutate, request } from '@/lib/api';
 export function Members() {
-  const { organization } = useAccount(),
-    [members, setMembers] = useState<Member[]>([]),
-    [loading, setLoading] = useState(false),
-    [error, setError] = useState('');
+  const { organization, user, refresh } = useAccount();
+  const organizationId = organization?.id;
+  const [result, setResult] = useState<{
+    organizationId: string;
+    members: Member[];
+    error?: string;
+  } | null>(null);
+  const members =
+    result?.organizationId === organizationId ? result?.members || [] : [];
+  const loading = !!organizationId && result?.organizationId !== organizationId;
+  const error =
+    result?.organizationId === organizationId ? result?.error || '' : '';
+  const setMembers = useCallback(
+    (members: Member[]) => {
+      if (organizationId) setResult({ organizationId, members });
+    },
+    [organizationId],
+  );
   const {
     register,
     handleSubmit,
@@ -35,26 +50,28 @@ export function Members() {
     z.output<typeof memberSchema>
   >({ resolver: zodResolver(memberSchema), defaultValues: { role: 'MEMBER' } });
   useEffect(() => {
-    if (!organization) return;
+    if (!organizationId) return;
     let active = true;
     api
-      .members(organization.id)
-      .then((v) => {
-        if (active) {
-          setMembers(v);
-          setLoading(false);
-        }
+      .members(organizationId)
+      .then((value) => {
+        if (active) setMembers(value);
       })
       .catch((e) => {
-        if (active) {
-          setError(e.message);
-          setLoading(false);
-        }
+        if (active)
+          setResult({
+            organizationId,
+            members: [],
+            error:
+              e instanceof Error
+                ? e.message
+                : 'Não foi possível carregar os membros',
+          });
       });
     return () => {
       active = false;
     };
-  }, [organization]);
+  }, [organizationId, setMembers]);
   return (
     <>
       <PageHeader
@@ -82,6 +99,7 @@ export function Members() {
                   <th>Nome</th>
                   <th>Email</th>
                   <th>Papel</th>
+                  {organization.role === 'OWNER' && <th>Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -107,6 +125,7 @@ export function Members() {
                                 'PATCH',
                               );
                               setMembers(await api.members(organization.id));
+                              if (m.user.id === user.id) await refresh();
                               toast.success('Papel atualizado');
                             } catch (e) {
                               toast.error((e as Error).message);
@@ -121,6 +140,32 @@ export function Members() {
                         <Badge>{m.role}</Badge>
                       )}
                     </td>
+                    {organization.role === 'OWNER' && (
+                      <td>
+                        <ConfirmDialog
+                          title="Remover acesso à organização?"
+                          description={
+                            'O acesso de ' +
+                            m.user.email +
+                            ' será revogado para esta organização.'
+                          }
+                          onConfirm={async () => {
+                            await request(
+                              '/organizations/' +
+                                organization.id +
+                                '/members/' +
+                                m.id,
+                              { method: 'DELETE' },
+                            );
+                            if (m.user.id === user.id) await refresh();
+                            else setMembers(await api.members(organization.id));
+                            toast.success('Acesso removido');
+                          }}
+                        >
+                          Remover
+                        </ConfirmDialog>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

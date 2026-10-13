@@ -64,6 +64,13 @@ test('register, login, edit profile, organization and logout', async ({
   await page.getByLabel('Identificador (slug)').fill('e2e-' + Date.now());
   await page.getByRole('button', { name: 'Criar organização' }).click();
   await expect(page.getByText('Organização guardada')).toBeVisible();
+  await page.goto('/dashboard/membros');
+  await page.getByRole('button', { name: 'Remover', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirmar', exact: true }).click();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'pelo menos um OWNER' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Fechar', exact: true }).click();
   await page.setViewportSize({ width: 375, height: 850 });
   expect(
     await page.evaluate(

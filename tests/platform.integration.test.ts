@@ -53,6 +53,8 @@ async function register(email: string) {
   return res.body as { id: string };
 }
 beforeAll(async () => {
+  if (process.env.NODE_ENV !== 'test')
+    throw new Error('Integration tests require NODE_ENV=test');
   const url = new URL(process.env.DATABASE_URL!);
   if (!url.pathname.endsWith('_test'))
     throw new Error(
@@ -523,6 +525,53 @@ describe('Organization isolation and RBAC', () => {
           .send({ role: 'OWNER' })
       ).status,
     ).toBe(400);
+  });
+  it('removes a member, immediately revoking organization access', async () => {
+    await register('removed@example.test');
+    const joined = await post(
+      owner,
+      '/organizations/' + orgId + '/members',
+      { email: 'removed@example.test', role: 'MEMBER' },
+      ownerCsrf,
+    );
+    expect(joined.status).toBe(201);
+    const a = agent();
+    await login(a, 'removed@example.test');
+    expect((await a.get('/api/v1/organizations/' + orgId)).status).toBe(200);
+    expect(
+      (
+        await owner
+          .delete(
+            '/api/v1/organizations/' + orgId + '/members/' + joined.body.id,
+          )
+          .set('Origin', origin)
+          .set('X-CSRF-Token', ownerCsrf)
+      ).status,
+    ).toBe(200);
+    expect((await a.get('/api/v1/organizations/' + orgId)).status).toBe(403);
+    expect(
+      await db.auditLog.count({
+        where: { resourceId: joined.body.id, action: 'members.removed' },
+      }),
+    ).toBe(1);
+  });
+  it('refuses to remove the final organization owner', async () => {
+    const own = await db.organizationMember.findFirstOrThrow({
+      where: { organizationId: orgId, role: 'OWNER' },
+    });
+    expect(
+      (
+        await owner
+          .delete('/api/v1/organizations/' + orgId + '/members/' + own.id)
+          .set('Origin', origin)
+          .set('X-CSRF-Token', ownerCsrf)
+      ).status,
+    ).toBe(400);
+    expect(
+      await db.organizationMember.count({
+        where: { organizationId: orgId, role: 'OWNER' },
+      }),
+    ).toBe(1);
   });
   it('enforces relational integrity and organization uniqueness', async () => {
     expect(

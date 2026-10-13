@@ -22,6 +22,7 @@ Prefixo `/api/v1`. Swagger `/api/docs`, JSON `/api/openapi.json`. Pedidos JSON c
 | GET, PATCH | /organizations/:id                       | Membership; alteração OWNER                 |
 | GET, POST  | /organizations/:id/members               | Leitura de membros / gestão OWNER           |
 | PATCH      | /organizations/:id/members/:memberId     | OWNER; papel de organização                 |
+| DELETE     | /organizations/:id/members/:memberId     | OWNER; preserva o último OWNER              |
 | GET        | /admin/stats                             | users.read; contagens reais                 |
 | GET        | /admin/users                             | users.read                                  |
 | GET        | /admin/organizations                     | organizations.read                          |

@@ -5,6 +5,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Req,
@@ -146,5 +147,46 @@ export class MembershipsController {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+  }
+  @Delete(':memberId') async remove(
+    @Req() req: AuthRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('memberId', ParseUUIDPipe) memberId: string,
+  ) {
+    await this.db.$transaction(
+      async (tx) => {
+        await this.authorization.organization(
+          req.user.id,
+          id,
+          'members.manage',
+          tx,
+        );
+        const member = await tx.organizationMember.findFirst({
+          where: { id: memberId, organizationId: id },
+        });
+        if (!member) throw new NotFoundException('Membro não encontrado');
+        if (
+          member.role === 'OWNER' &&
+          (await tx.organizationMember.count({
+            where: { organizationId: id, role: 'OWNER' },
+          })) <= 1
+        )
+          throw new BadRequestException(
+            'A organização deve manter pelo menos um OWNER',
+          );
+        await tx.organizationMember.delete({ where: { id: memberId } });
+        await this.audit.record(
+          'members.removed',
+          'OrganizationMember',
+          req.user.id,
+          memberId,
+          id,
+          { previousRole: member.role },
+          tx,
+        );
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+    return { message: 'Acesso à organização removido' };
   }
 }
