@@ -20,7 +20,8 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: 'pnpm --filter @devtrust/api dev',
+      command:
+        'pnpm --filter @devtrust/api exec tsx --tsconfig tsconfig.json ../../tests/e2e/api-server.ts',
       url: 'http://localhost:4400/api/openapi.json',
       reuseExistingServer: false,
       timeout: 120000,

@@ -12,3 +12,6 @@ node_modules
 .turbo
 playwright-report
 test-results
+
+# Private local configuration alias
+env

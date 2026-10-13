@@ -1,4 +1,8 @@
+import { ManualExchangeRateProvider } from './manual-exchange-rate.provider';
 import { Module } from '@nestjs/common';
-/** Architectural boundary reserved for phase 2; no commercial operations exposed. */
-@Module({})
+import { PricingService } from './pricing.service';
+@Module({
+  providers: [PricingService, ManualExchangeRateProvider],
+  exports: [PricingService],
+})
 export class PricingModule {}

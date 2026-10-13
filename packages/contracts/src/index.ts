@@ -34,7 +34,7 @@ export const email = z
   .email()
   .max(254)
   .transform((v) => v.toLowerCase().trim());
-export const password = z.string().min(12).max(128);
+export const password = z.string().min(1, 'Introduza uma password.').max(128);
 export const profileSchema = z
   .object({
     firstName: z.string().trim().min(1).max(80),
@@ -194,3 +194,5 @@ export const organizationPermissions: Record<
   ],
   MEMBER: ['organizations.read', 'members.read', 'domains.read', 'orders.read'],
 };
+
+export * from './commerce';

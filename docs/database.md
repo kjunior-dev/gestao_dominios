@@ -19,3 +19,7 @@ A migração inicial é versionada. Não usar schema push como estratégia de pr
 Criação de organização e OWNER, alteração crítica de conta e auditoria, consumo de tokens e revogação de sessões são transacionais. Gestão de membros e bootstrap usam SERIALIZABLE. É proibido remover o último OWNER; conflitos concorrentes devolvem 409. FKs e constraints impedem relações órfãs e associações duplicadas.
 
 Não há credenciais administrativas fixas. O seed usa SEED_PASSWORD e só cria dados demonstrativos. A base de testes termina obrigatoriamente em `_test`; não partilhar com desenvolvimento ou produção.
+
+## Migração comercial Fase 2
+
+202610130002_commerce adiciona Registrar, Tld, TldRegistrar (N:N), TldPrice (versionado), ExchangeRate, DomainSearchLog, Cart e CartItem. Relações, constraints e política financeira: [TLDs](tlds.md), [preços](pricing.md), [carrinho](cart.md). Nenhuma tabela da Fase 1 é removida. O seed não ativa serviços comerciais ou inventa taxas/preços.

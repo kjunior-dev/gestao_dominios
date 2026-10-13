@@ -2,6 +2,8 @@
 
 Validação local em 13 de outubro de 2026, macOS, Node 22.14.0 e pnpm 9.15.2. PostgreSQL 17 e Redis foram iniciados em instâncias novas e isoladas, apenas no loopback. Nenhuma base pré-existente foi apagada ou reinicializada.
 
+A revisão final inclui o isolamento dos resultados da página de membros ao trocar de organização, a apresentação de erros nos diálogos de confirmação, os headers CSRF na documentação OpenAPI e mensagens claras quando a API está indisponível ou devolve uma resposta inválida. Build, typecheck, lint, formatação e os três grupos de testes foram novamente executados após estas alterações.
+
 | Verificação executada                                                  | Resultado                                                                                       |
 | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `pnpm install --frozen-lockfile`                                       | Passou; instalação reproduzível                                                                 |

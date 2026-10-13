@@ -7,7 +7,8 @@
     "build": "tsc",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "registrar:verify": "tsx src/modules/registrars/verify.ts"
   },
   "dependencies": {
     "@devtrust/contracts": "workspace:*",

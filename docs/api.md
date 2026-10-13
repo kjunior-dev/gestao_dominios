@@ -33,4 +33,26 @@ Prefixo `/api/v1`. Swagger `/api/docs`, JSON `/api/openapi.json`. Pedidos JSON c
 
 Mutações públicas exigem Origin=APP_URL. Autenticadas exigem também cookie de sessão e X-CSRF-Token. Login emite ambos os cookies; o cliente central faz isto automaticamente. `GET /auth/me` nunca devolve passwordHash, segredo ou token. IDs nos parâmetros são validados como UUID. Valores secretos de MFA são devolvidos apenas durante enrollment; códigos de recuperação só ao confirmar.
 
-Não existem endpoints de pesquisa/registo de domínios, pagamento ou DNS nesta fase.
+Não existem endpoints de registo real de domínios, pagamento ou DNS.
+
+## Fase 2
+
+| Método        | Path (sem /api/v1)                  | Acesso                               |
+| ------------- | ----------------------------------- | ------------------------------------ |
+| GET           | /tlds                               | Público; catálogo e preços de venda  |
+| POST          | /domains/check                      | Público; Origin e rate limit         |
+| GET           | /cart                               | Visitante ou própria conta           |
+| POST          | /cart/items                         | Próprio carrinho; cotação no backend |
+| PATCH, DELETE | /cart/items/:id                     | Item próprio; PATCH revalida período |
+| DELETE        | /cart                               | Próprio carrinho                     |
+| GET, POST     | /admin/tlds                         | pricing.manage                       |
+| GET, PATCH    | /admin/tlds/:id                     | pricing.manage                       |
+| GET, POST     | /admin/pricing                      | pricing.manage                       |
+| POST          | /admin/pricing/:id/sync             | pricing.manage                       |
+| GET, POST     | /admin/exchange-rates               | pricing.manage                       |
+| GET           | /admin/registrars                   | pricing.manage                       |
+| POST          | /admin/registrars/openprovider/sync | system.manage                        |
+| GET           | /admin/domain-search/metrics        | audit.read                           |
+| GET           | /admin/domain-search/logs           | audit.read; paginação/pesquisa       |
+
+Visitantes inicializam o carrinho via GET antes de mutações e usam X-Cart-CSRF-Token. Autenticados usam X-CSRF-Token. Ambos exigem Origin. Documentação OpenAPI inclui schemas partilhados e autenticação opcional do carrinho. Referências detalhadas em domain-search.md, pricing.md e cart.md.

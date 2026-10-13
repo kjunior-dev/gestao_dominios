@@ -20,7 +20,12 @@
         "WEB_PORT",
         "TOTP_ENCRYPTION_KEY",
         "SESSION_TTL_HOURS",
-        "DEV_MAILBOX_DIR"
+        "DEV_MAILBOX_DIR",
+        "OPENPROVIDER_*",
+        "DOMAIN_*",
+        "CART_TTL_HOURS",
+        "QUOTE_TTL_SECONDS",
+        "EXCHANGE_RATE_PROVIDER"
       ]
     },
     "typecheck": {

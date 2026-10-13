@@ -1,4 +1,5 @@
 'use client';
+import { globalPermissions } from '@devtrust/contracts';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -25,7 +26,7 @@ import {
 import { toast } from 'sonner';
 import { useAccount } from '@/hooks/account-context';
 import { mutate } from '@/lib/api';
-import { Brand } from './public-shell';
+import { Brand } from './brand';
 import { ThemeToggle } from './providers';
 export function AppShell({
   children,
@@ -51,11 +52,17 @@ export function AppShell({
         ['/admin', 'Visão geral', LayoutDashboard],
         ['/admin/utilizadores', 'Utilizadores', Users],
         ['/admin/organizacoes', 'Organizações', Building2],
+        ['/admin/tlds', 'Extensões', Building2],
+        ['/admin/pricing', 'Preços e câmbio', Settings],
+        ['/admin/registrars', 'Registradores', ShieldCheck],
         ['/admin/auditoria', 'Auditoria', ScrollText],
         ['/admin/definicoes', 'Definições', Settings],
       ] as const)
     : ([
         ['/dashboard', 'Visão geral', LayoutDashboard],
+        ['/dashboard/carrinho', 'Carrinho', Building2],
+        ['/dashboard/dominios', 'Domínios', Building2],
+        ['/dashboard/encomendas', 'Encomendas', ScrollText],
         ['/dashboard/perfil', 'O meu perfil', UserRound],
         ['/dashboard/seguranca', 'Segurança', ShieldCheck],
         ['/dashboard/organizacao', 'Organização', Building2],
@@ -78,17 +85,28 @@ export function AppShell({
           {admin ? 'ADMINISTRAÇÃO' : 'ÁREA DO CLIENTE'}
         </span>
         <nav aria-label="Painel">
-          {nav.map(([href, label, Icon]) => (
-            <Link
-              className={path === href ? 'active' : ''}
-              key={href}
-              href={href}
-              onClick={() => setOpen(false)}
-            >
-              <Icon size={18} />
-              {label}
-            </Link>
-          ))}
+          {nav
+            .filter(
+              ([href]) =>
+                !admin ||
+                ![
+                  '/admin/tlds',
+                  '/admin/pricing',
+                  '/admin/registrars',
+                ].includes(href) ||
+                globalPermissions[user.globalRole].includes('pricing.manage'),
+            )
+            .map(([href, label, Icon]) => (
+              <Link
+                className={path === href ? 'active' : ''}
+                key={href}
+                href={href}
+                onClick={() => setOpen(false)}
+              >
+                <Icon size={18} />
+                {label}
+              </Link>
+            ))}
         </nav>
         <div className="sidebar-bottom">
           <Link href={admin ? '/dashboard' : '/'} className="actions">

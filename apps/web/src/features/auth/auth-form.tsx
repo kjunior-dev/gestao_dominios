@@ -48,7 +48,7 @@ const details: Record<
   },
   reset: {
     title: 'Uma nova password',
-    description: 'Escolha uma password com pelo menos 12 caracteres.',
+    description: 'Escolha a sua nova password.',
     endpoint: 'reset-password',
     button: 'Guardar password',
   },

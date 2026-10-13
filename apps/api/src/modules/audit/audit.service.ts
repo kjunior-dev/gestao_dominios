@@ -3,6 +3,12 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@devtrust/database';
 import { DatabaseService } from '../../common/database.service';
 const allowed = new Set([
+  'sellingPriceMinor',
+  'currency',
+  'marginType',
+  'marginValue',
+  'source',
+  'rate',
   'role',
   'status',
   'previousRole',

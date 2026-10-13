@@ -53,3 +53,6 @@ playwright-report/
 .local/
 
 !.env.test.example
+
+# Private local configuration alias
+/env

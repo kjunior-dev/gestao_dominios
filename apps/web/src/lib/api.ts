@@ -26,17 +26,37 @@ export async function request<T>(
           .find((c) => c.startsWith('dt_csrf='))
           ?.split('=')[1]
       : undefined;
+  const cartCsrf =
+    typeof document !== 'undefined'
+      ? document.cookie
+          .split('; ')
+          .find((c) => c.startsWith('dt_cart_csrf='))
+          ?.split('=')[1]
+      : undefined;
   const response = await fetch('/api/v1' + path, {
     ...options,
     credentials: 'same-origin',
     cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
+      ...(cartCsrf
+        ? { 'X-Cart-CSRF-Token': decodeURIComponent(cartCsrf) }
+        : {}),
       ...(csrf ? { 'X-CSRF-Token': decodeURIComponent(csrf) } : {}),
       ...options.headers,
     },
+  }).catch(() => {
+    throw new ApiError(
+      'Não foi possível ligar ao serviço. Tente novamente.',
+      503,
+    );
   });
-  const body = await response.json();
+  const body = await response.json().catch(() => {
+    throw new ApiError(
+      'Resposta indisponível do serviço. Tente novamente.',
+      502,
+    );
+  });
   if (
     response.status === 401 &&
     !path.startsWith('/auth/') &&

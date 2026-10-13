@@ -893,3 +893,95 @@ th {
     padding: 8px 15px;
   }
 }
+
+/* Commerce uses the same surface, spacing and semantic colour tokens. */
+.domain-search {
+  width: 100%;
+  text-align: left;
+}
+.search-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+.search-options label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.search-options select {
+  width: auto;
+}
+.search-results {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.domain-result {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+}
+.domain-result h3 {
+  overflow-wrap: anywhere;
+}
+.domain-result-price {
+  text-align: right;
+  min-width: 13rem;
+}
+.domain-result strong,
+.cart-total strong {
+  font-size: 1.35rem;
+}
+.domain-result p {
+  font-size: 0.85rem;
+}
+.cart-total {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.tld-catalog {
+  margin: 1.5rem 0;
+  text-align: left;
+}
+.commerce-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.commerce-form .form-actions,
+.commerce-form .message {
+  grid-column: 1/-1;
+}
+.commerce-filter {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+@media (max-width: 640px) {
+  .domain-result {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .domain-result-price {
+    text-align: left;
+    min-width: 0;
+  }
+  .commerce-form {
+    grid-template-columns: 1fr;
+  }
+  .public-header .actions {
+    gap: 0.6rem;
+  }
+  .public-header .actions > a {
+    font-size: 0.8rem;
+  }
+  .search-options {
+    gap: 0.6rem;
+  }
+}

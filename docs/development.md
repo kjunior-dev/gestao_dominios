@@ -7,3 +7,7 @@ Para criar novas migrações em desenvolvimento: `pnpm exec dotenv -e .env -- pn
 Os componentes UI seguem os padrões source-owned de shadcn: Slot/CVA para Button e Radix para dialogs/dropdowns. Tokens semânticos estão em `apps/web/src/app/globals.css`. Os estilos dark alteram apenas os tokens. FormField liga label e input; estados vazios, erros, skeletons e toasts são partilhados. Persistência do tema pode usar armazenamento de preferência, nunca credenciais.
 
 Adicione casos de uso nos módulos correspondentes, preserve contratos strict e verifique autorização explícita. Não exponha modelos Prisma completos como respostas de User. A documentação de Next.js nesta versão encontra-se no pacote local e deve ser consultada antes de mudanças.
+
+## Openprovider
+
+Configure as variáveis exclusivamente em `.env` ou num gestor de segredos. `pnpm registrar:verify` é um smoke test de autenticação/disponibilidade de leitura; uma falha não deve ser substituída por um provider fictício. Veja [openprovider.md](openprovider.md) para requisitos e a discrepância documental de versões. Não execute integração e E2E em simultâneo usando `.env.test`.

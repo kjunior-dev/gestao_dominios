@@ -12,8 +12,10 @@ test('homepage is honest and responsive', async ({ page }) => {
     page.getByRole('heading', { name: /A sua próxima grande ideia/ }),
   ).toBeVisible();
   await page.getByLabel('Nome de domínio').fill('devtrust.cv');
-  await page.getByRole('button', { name: 'Explorar domínio' }).click();
-  await expect(page.getByText(/Não foi efetuada uma consulta/)).toBeVisible();
+  await page.getByRole('button', { name: 'Pesquisar domínio' }).click();
+  await expect(
+    page.getByRole('alert').filter({ hasText: /Extensão não suportada/ }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Alternar tema' }).click();
   await expect(page.locator('html')).toHaveClass(/dark/);
   await page.getByRole('button', { name: 'Alternar tema' }).click();
@@ -53,6 +55,19 @@ test('register, login, edit profile, organization and logout', async ({
   await expect(
     page.getByRole('heading', { name: 'Olá, Cliente.' }),
   ).toBeVisible();
+  await page.getByRole('link', { name: 'Visitar a loja', exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(
+    page.getByRole('link', { name: 'Minha conta', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Entrar', exact: true }),
+  ).toHaveCount(0);
+  expect((await page.request.get('/api/v1/auth/me')).status()).toBe(200);
+  await page.getByRole('link', { name: 'Minha conta', exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto('/login');
+  await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto('/dashboard/perfil');
@@ -207,6 +222,59 @@ test('enrolls administrator MFA and opens real administrative lists', async ({
     await page.goto('/admin/auditoria');
     await expect(
       page.getByRole('heading', { name: 'Auditoria' }),
+    ).toBeVisible();
+    await page.goto('/admin/tlds');
+    await expect(
+      page.getByRole('heading', { name: 'Catálogo de extensões' }),
+    ).toBeVisible();
+    await page
+      .getByRole('link', { name: 'Editar', exact: true })
+      .first()
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Editar extensão' }),
+    ).toBeVisible();
+    await page.getByLabel('Destacar na homepage').uncheck();
+    await page.getByRole('button', { name: 'Guardar extensão' }).click();
+    await expect(page).toHaveURL(/\/admin\/tlds$/);
+    await page.goto('/admin/pricing');
+    await expect(
+      page.getByRole('heading', { name: 'Preços e câmbio' }),
+    ).toBeVisible();
+    await page
+      .getByLabel('Extensão', { exact: true })
+      .selectOption({ label: '.com' });
+    await page
+      .getByLabel('Fornecedor', { exact: true })
+      .selectOption({ label: 'E2E CONTRACT MOCK ONLY' });
+    await page.getByLabel('Período (anos)', { exact: true }).fill('3');
+    await page
+      .getByLabel('Moeda fornecedor', { exact: true })
+      .selectOption('CVE');
+    await page
+      .getByLabel('Custo fornecedor (cêntimos)', { exact: true })
+      .fill('3000');
+    await page
+      .getByLabel('Margem (valor fixo na moeda de venda ou %)', { exact: true })
+      .fill('25');
+    await page
+      .getByLabel('Incremento de arredondamento (cêntimos)', {
+        exact: true,
+      })
+      .fill('1');
+    await page
+      .getByLabel('Validade (ISO UTC)', { exact: true })
+      .fill(new Date(Date.now() + 86400000).toISOString());
+    await page
+      .getByRole('button', { name: 'Publicar preço', exact: true })
+      .click();
+    await expect(page.getByText('Versão comercial publicada')).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: '37,50 CVE', exact: true }),
+    ).toBeVisible();
+    await page.goto('/admin/registrars');
+    await expect(
+      page.getByRole('heading', { name: 'Registradores', exact: true }),
     ).toBeVisible();
     for (const width of [375, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });

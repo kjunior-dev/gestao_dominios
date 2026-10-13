@@ -1,3 +1,4 @@
+import { CartService } from '../cart/cart.service';
 import { ApiInput } from '../../common/openapi';
 import { setTimeout as delay } from 'node:timers/promises';
 import { AccountScoped } from '../../common/security';
@@ -41,6 +42,7 @@ const accepted = {
 export class AuthController {
   constructor(
     @Inject(AuthService) private auth: AuthService,
+    @Inject(CartService) private cart: CartService,
     @Inject(RuntimeService) private runtime: RuntimeService,
   ) {}
   @Public()
@@ -53,7 +55,7 @@ export class AuthController {
       required: ['email', 'password', 'firstName', 'lastName'],
       properties: {
         email: { type: 'string', format: 'email' },
-        password: { type: 'string', minLength: 12 },
+        password: { type: 'string', minLength: 1, maxLength: 128 },
         firstName: { type: 'string' },
         lastName: { type: 'string' },
         phone: { type: 'string' },
@@ -86,6 +88,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.auth.login(body, req);
+    await this.cart.merge(req, result.user.id, res);
     const production = this.runtime.env.NODE_ENV === 'production';
     const options = {
       secure: production,

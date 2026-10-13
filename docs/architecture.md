@@ -38,3 +38,7 @@ Domínios, registradores, preços, encomendas e pagamentos têm módulos sem end
 - [Prisma Migrate v6](https://www.prisma.io/docs/orm/v6/prisma-migrate/getting-started).
 - [BullMQ retry e backoff](https://docs.bullmq.io/guide/retrying-failing-jobs).
 - [shadcn Button / Radix](https://ui.shadcn.com/docs/components/radix/button).
+
+## Fase 2
+
+DomainsModule coordena catálogo ativo, normalização, AvailabilityCache e RegistrarRegistry. RegistrarsModule contém a porta interna e o adaptador Openprovider. PricingModule coordena política versionada e ExchangeRateProvider manual. CatalogModule fornece administração auditada. CartModule mantém identidade/persistência e revalida através de DomainsModule; AuthModule associa o carrinho após login. Os módulos continuam no mesmo NestJS, sem microserviços. O worker existente acrescenta manutenção de retenção. Nenhum provider fictício integra o runtime da aplicação.

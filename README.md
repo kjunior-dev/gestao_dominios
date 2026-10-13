@@ -1,8 +1,8 @@
 # DevTrust Domains
 
-Plataforma de venda e gestão de domínios para a DevTrust, Cabo Verde. A Fase 1 implementa contas, organizações, segurança e administração; não efetua compras, pagamentos ou consultas de disponibilidade.
+Plataforma de venda e gestão de domínios para a DevTrust, Cabo Verde. As Fases 1 e 2 implementam contas, organizações, segurança, administração, catálogo, pesquisa e carrinho; não efetua compras ou pagamentos. As consultas externas dependem de credenciais Openprovider e configuração comercial válida.
 
-Estado da entrega: a aplicação e os testes locais foram validados; a aceitação integral depende da execução do Compose num ambiente com Docker. Resultados e comandos não executados: [validação](docs/validation.md).
+Estado da entrega: a aplicação e os testes locais foram validados; a aceitação integral depende da execução do Compose num ambiente com Docker. Resultados da Fase 1: [validação](docs/validation.md). A verificação real Openprovider da Fase 2 permanece pendente: [testes da Fase 2](docs/phase-2-testing.md).
 
 ## Tecnologias e estrutura
 
@@ -28,7 +28,7 @@ cp .env.example .env
 chmod 600 .env
 # Gere TOTP_ENCRYPTION_KEY e coloque o resultado em .env:
 openssl rand -hex 32
-# Defina também uma SEED_PASSWORD de desenvolvimento com 12+ caracteres.
+# Defina também uma SEED_PASSWORD de desenvolvimento não vazia.
 pnpm install --frozen-lockfile
 pnpm db:generate
 pnpm --filter @devtrust/contracts build
@@ -110,3 +110,13 @@ Os testes de integração exigem um nome de base terminado em `_test` e Redis DB
 ## Documentação
 
 [Arquitetura](docs/architecture.md) · [Dados](docs/database.md) · [Autenticação](docs/authentication.md) · [RBAC](docs/rbac.md) · [API](docs/api.md) · [Desenvolvimento](docs/development.md) · [Testes](docs/testing.md) · [Deploy](docs/deployment.md) · [Segurança](docs/security.md).
+
+## Fase 2: catálogo, pesquisa e carrinho
+
+A migração comercial é aditiva. Execute `pnpm db:migrate` e `pnpm db:seed`; o seed cria com/net/org inativos, sem preços fictícios. Configure Openprovider exclusivamente no backend (`OPENPROVIDER_ENABLED=true`, URL autorizada, username/password); depois execute `pnpm registrar:verify`. Sem credenciais, a integração devolve PROVIDER_DISABLED de forma controlada.
+
+No painel, SUPER_ADMIN com MFA pode sincronizar o catálogo em `/admin/registrars/openprovider`. Administradores com `pricing.manage` revêm/ativam TLDs em `/admin/tlds`, configuram taxas verificadas e publicam versões comerciais em `/admin/pricing`. Não existe câmbio implícito: sem uma taxa válida EUR/USD → CVE, o preço convertido é bloqueado. Configure explicitamente cada período pretendido.
+
+Pesquise em `/dominios/pesquisar`; consulte `/dominios/precos` e `/carrinho`. O carrinho persiste para visitantes e contas, é associado após login e revalida disponibilidade/preço no servidor. `/dashboard/dominios` e `/dashboard/encomendas` continuam vazios porque não são efetuadas compras.
+
+[Pesquisa](docs/domain-search.md) · [Registradores](docs/registrar-integration.md) · [Openprovider](docs/openprovider.md) · [TLDs](docs/tlds.md) · [Preços](docs/pricing.md) · [Câmbio](docs/currency.md) · [Carrinho](docs/cart.md) · [Testes Fase 2](docs/phase-2-testing.md).

@@ -1,3 +1,4 @@
+import { pruneCommerce } from './maintenance';
 import 'dotenv/config';
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
@@ -7,6 +8,12 @@ import pino from 'pino';
 import { createNotificationWorker } from './worker';
 const env = z
   .object({
+    DOMAIN_LOG_RETENTION_DAYS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(90)
+      .default(30),
     DATABASE_URL: z.string().url(),
     REDIS_URL: z.string().url(),
     TOTP_ENCRYPTION_KEY: z.string().regex(/^[a-f0-9]{64}$/),
@@ -18,7 +25,7 @@ const env = z
   .parse(process.env);
 if (env.NODE_ENV === 'production')
   throw new Error(
-    'Development notification transport is disabled in production. Configure a production transport in phase 2.',
+    'Development notification transport is disabled in production. Configure a production transactional transport before deployment.',
   );
 const logger = pino(),
   db = new PrismaClient(),
@@ -56,6 +63,12 @@ async function tick() {
       },
     );
 }
+const maintain = () =>
+  pruneCommerce(db, env.DOMAIN_LOG_RETENTION_DAYS).catch(() =>
+    logger.error({ event: 'commerce.retention_failed' }),
+  );
+const maintenanceTimer = setInterval(() => void maintain(), 3600000);
+void maintain();
 const timer = setInterval(
   () =>
     void tick().catch(() => logger.error({ event: 'worker.health_failed' })),
@@ -64,6 +77,7 @@ const timer = setInterval(
 void tick().catch(() => logger.error({ event: 'worker.health_failed' }));
 async function shutdown() {
   clearInterval(timer);
+  clearInterval(maintenanceTimer);
   await worker.close();
   await queue.close();
   await connection.del('worker:heartbeat');

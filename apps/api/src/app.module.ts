@@ -1,3 +1,5 @@
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { CartModule } from './modules/cart/cart.module';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { CoreModule } from './common/core.module';
@@ -21,6 +23,8 @@ import { PaymentsModule } from './modules/payments/payments.module';
 @Module({
   imports: [
     CoreModule,
+    CatalogModule,
+    CartModule,
     AuthModule,
     UsersModule,
     OrganizationsModule,

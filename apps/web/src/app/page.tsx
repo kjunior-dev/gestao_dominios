@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Button, Card, Badge } from '@devtrust/ui';
 import { PublicShell } from '@/components/public-shell';
-import { DomainSearch } from '@/features/domains/domain-search';
+import { DomainSearch, TldCatalog } from '@/features/domains/domain-search';
 export default function Home() {
   return (
     <PublicShell>
@@ -32,14 +32,7 @@ export default function Home() {
               online e gira a sua organização num só lugar.
             </p>
             <DomainSearch />
-            <div className="extensions">
-              {['.com', '.cv', '.net', '.org', '.io'].map((t) => (
-                <div key={t} className="extension">
-                  {t}
-                  <small>EM BREVE</small>
-                </div>
-              ))}
-            </div>
+            <TldCatalog featured />
           </div>
         </section>
         <div className="container trust-strip">
@@ -103,8 +96,8 @@ export default function Home() {
                 <br />à sua presença digital.
               </h2>
               <p>
-                Comece por criar a sua conta e preparar a organização. Os
-                serviços de domínios chegarão nas próximas fases.
+                Comece por criar a sua conta e preparar a organização. Pesquise
+                domínios e guarde cotações no seu carrinho.
               </p>
               <Button asChild>
                 <Link href="/registar">
@@ -146,7 +139,7 @@ export default function Home() {
             {[
               [
                 'Já posso comprar um domínio?',
-                'Ainda não. Nesta fase pode criar uma conta, proteger o acesso e gerir a sua organização. A pesquisa e compra serão disponibilizadas posteriormente.',
+                'Ainda não. Nesta fase pode criar uma conta, proteger o acesso e gerir a sua organização. Pode pesquisar disponibilidade e preparar o carrinho. A compra será disponibilizada posteriormente.',
               ],
               [
                 'Posso gerir uma conta com a minha equipa?',
@@ -158,7 +151,7 @@ export default function Home() {
               ],
               [
                 'Existem preços comerciais disponíveis?',
-                'Os preços serão publicados após a integração com os fornecedores. Não existem cobranças ou preços ativos nesta fase.',
+                'Os preços publicados dependem de configuração comercial válida. Pesquise o nome para confirmar a cotação; não existem cobranças nesta fase.',
               ],
             ].map(([q, a]) => (
               <details key={q}>

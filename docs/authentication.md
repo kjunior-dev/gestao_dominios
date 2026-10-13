@@ -1,6 +1,6 @@
 # Autenticação
 
-Registo cria CUSTOMER ativo e inicia confirmação por token aleatório de 32 bytes. Passwords têm 12–128 caracteres, com Argon2id (64 MiB, três iterações). Email é normalizado.
+Registo cria CUSTOMER ativo e inicia confirmação por token aleatório de 32 bytes. Passwords são obrigatórias e aceitam 1–128 caracteres, com Argon2id (64 MiB, três iterações). Email é normalizado.
 
 Login usa cookies `dt_session` em desenvolvimento e `__Host-dt_session` em produção: HttpOnly, SameSite=Lax, Path=/ e Secure em produção. O token aleatório de 256 bits é guardado apenas como SHA-256. Não são usados tokens em localStorage. Sessões expiram após SESSION_TTL_HOURS; logout, revogação individual, logout-all, alteração e recuperação de password invalidam-nas.
 
@@ -11,3 +11,5 @@ Os links de confirmação/recuperação usam fragmentos de URL (#token), que nã
 MFA TOTP: segredo cifrado AES-256-GCM com chave externa à base. Setup devolve secret/URI apenas para o utilizador autenticado. Confirm ativa MFA e apresenta oito códigos aleatórios, guardados como hashes. Códigos TOTP e códigos de recuperação são protegidos contra replay. Ativar MFA revoga outras sessões. Administradores recebem sessão restrita até confirmar MFA; todos os endpoints administrativos exigem uma sessão já verificada pelo guard.
 
 Não existe desativação de MFA por API nesta fase; recuperação pode usar códigos de uso único. Recuperar a password não remove MFA. Perda total de fatores exige procedimento operacional futuro com verificação de identidade, sem bypass público.
+
+A loja consulta a sessão no servidor para mostrar “Minha conta” aos utilizadores autenticados. “Visitar a loja” não termina a sessão. A página de login redireciona sessões válidas para o dashboard. Esta navegação foi validada no teste E2E de registo/login/perfil/logout.

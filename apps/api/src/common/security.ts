@@ -19,6 +19,7 @@ export type AuthRequest = Request & { user: User; session: Session };
 export const HealthProbe = () => SetMetadata('healthProbe', true);
 export const AccountScoped = () => SetMetadata('scope', 'self');
 export const OrganizationScoped = () => SetMetadata('scope', 'organization');
+export const OptionalAccount = () => SetMetadata('optionalAccount', true);
 export const Public = () => SetMetadata('public', true);
 export const EnrollmentAllowed = () => SetMetadata('enrollment', true);
 export const RequirePermission = (permission: Permission) =>
@@ -57,6 +58,11 @@ export class SecurityGuard implements CanActivate {
     const token = (req.cookies as Record<string, string> | undefined)?.[
       sessionCookie(this.runtime.env.NODE_ENV === 'production')
     ];
+    if (
+      !token &&
+      this.reflector.getAllAndOverride<boolean>('optionalAccount', handlers)
+    )
+      return true;
     if (!token || !/^[a-f0-9]{64}$/.test(token))
       throw new UnauthorizedException('Autenticação necessária');
     const session = await this.db.session.findUnique({

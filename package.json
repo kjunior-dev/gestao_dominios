@@ -19,7 +19,8 @@
     "db:generate": "pnpm --filter @devtrust/database generate",
     "db:migrate": "dotenv -e .env -- pnpm --filter @devtrust/database migrate",
     "db:seed": "dotenv -e .env -- pnpm --filter @devtrust/database seed",
-    "admin:bootstrap": "dotenv -e .env -- pnpm --filter @devtrust/database bootstrap"
+    "admin:bootstrap": "dotenv -e .env -- pnpm --filter @devtrust/database bootstrap",
+    "registrar:verify": "dotenv -e .env -- pnpm --filter @devtrust/api registrar:verify"
   },
   "devDependencies": {
     "@devtrust/contracts": "workspace:^",

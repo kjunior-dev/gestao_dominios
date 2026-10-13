@@ -20,7 +20,7 @@ export async function createApp() {
     origin: runtime.env.APP_URL,
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+    allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Cart-CSRF-Token'],
   });
   app.useGlobalFilters(new ErrorFilter(runtime));
   app.enableShutdownHooks();
@@ -30,19 +30,15 @@ export async function createApp() {
       .setTitle('DevTrust Domains')
       .setVersion('1.0')
       .setDescription(
-        'Phase 1 account, organization and administration API. Mutation requests require Origin and X-CSRF-Token.',
+        'Account, catalog, registrar search and cart API. Mutation requests require Origin and X-CSRF-Token.',
       )
       .addCookieAuth(sessionCookie(runtime.env.NODE_ENV === 'production'))
       .build(),
   );
   const publicPaths = new Set(
-    [
-      'register',
-      'login',
-      'forgot-password',
-      'reset-password',
-      'verify-email',
-    ].map((path) => '/api/v1/auth/' + path),
+    ['register', 'login', 'forgot-password', 'reset-password', 'verify-email']
+      .map((path) => '/api/v1/auth/' + path)
+      .concat(['/api/v1/tlds', '/api/v1/domains/check']),
   );
   for (const [path, item] of Object.entries(document.paths)) {
     for (const [method, operation] of Object.entries(item || {})) {
@@ -50,7 +46,9 @@ export async function createApp() {
         operation.security =
           path === '/api/v1/health' || publicPaths.has(path)
             ? []
-            : [{ cookie: [] }];
+            : path.startsWith('/api/v1/cart')
+              ? [{ cookie: [] }, {}]
+              : [{ cookie: [] }];
       if (
         operation &&
         ['post', 'patch', 'delete'].includes(method) &&
@@ -59,10 +57,14 @@ export async function createApp() {
         operation.parameters = [
           ...(operation.parameters || []),
           {
-            name: 'X-CSRF-Token',
+            name: path.startsWith('/api/v1/cart')
+              ? 'X-Cart-CSRF-Token'
+              : 'X-CSRF-Token',
             in: 'header',
             required: true,
-            description: 'Valor do cookie dt_csrf associado à sessão.',
+            description: path.startsWith('/api/v1/cart')
+              ? 'Visitante: dt_cart_csrf. Autenticado: usar X-CSRF-Token com dt_csrf.'
+              : 'Valor do cookie dt_csrf associado à sessão.',
             schema: { type: 'string' },
           },
         ];

@@ -1,19 +1,15 @@
 import { PublicShell } from '@/components/public-shell';
-import { Card, EmptyState, PageHeader } from '@devtrust/ui';
+import { TldCatalog } from '@/features/domains/domain-search';
+import { PageHeader } from '@devtrust/ui';
 export default function Page() {
   return (
     <PublicShell>
       <main className="section container">
         <PageHeader
-          title="Preços transparentes, desde o início."
-          description="A oferta comercial será publicada após a integração com os fornecedores."
+          title="Preços de domínios"
+          description="Preços standard publicados em CVE. Pesquise o domínio para obter uma cotação individual."
         />
-        <Card>
-          <EmptyState
-            title="Tabela de preços em preparação"
-            description="Não existem preços comerciais ativos, pagamentos ou encomendas nesta fase."
-          />
-        </Card>
+        <TldCatalog />
       </main>
     </PublicShell>
   );

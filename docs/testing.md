@@ -7,3 +7,7 @@ Copie `.env.test.example` para `.env.test`, crie exclusivamente `devtrust_test`,
 Migre a base de testes antes da suite. E2E usa utilizadores únicos e serviços em 3300/4400. CI usa containers efémeros. Os testes incluem registo/duplicado, Argon2id, login correto/incorreto/limite, Origin/CSRF, logout/all, expiração/revogação, reset/consumo único, confirmação/expiração, alteração de password, permissões e membership, integridade relacional, último OWNER, MFA, anti replay, recuperação MFA, paginação/contagens reais, notificações/duplicados/retry/falha. E2E cobre confirmação e recuperação reais via caixa local, além de homepage sem resultados fictícios, registo/login/perfil/organização/logout, proteção de páginas, erros e larguras 375/768/1440.
 
 A validação de Docker Compose depende de Docker instalado. Resultados e limitações reais encontram-se em `docs/validation.md`; a presença de um workflow não significa que tenha sido executado no GitHub.
+
+## Regressão comercial
+
+A suíte passou a incluir testes comerciais e um servidor E2E contratual separado do runtime. Veja [phase-2-testing.md](phase-2-testing.md). Integração e E2E partilham `.env.test` e devem ser executados sequencialmente; não mantenha um worker de desenvolvimento ligado ao Redis DB 1 durante a integração.
