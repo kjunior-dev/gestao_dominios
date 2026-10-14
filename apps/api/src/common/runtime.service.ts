@@ -8,6 +8,12 @@ export class RuntimeService implements OnModuleDestroy, OnModuleInit {
   readonly env = environment();
   readonly logger = pino({
     redact: [
+      'username',
+      'OPENPROVIDER_USERNAME',
+      'OPENPROVIDER_PASSWORD',
+      '*.password',
+      '*.token',
+      '*.secret',
       'password',
       'token',
       'secret',
@@ -35,6 +41,14 @@ export class RuntimeService implements OnModuleDestroy, OnModuleInit {
   }
   async onModuleInit() {
     await this.redis.ping();
+    this.logger.info({
+      event: 'registrar.configuration',
+      provider: 'openprovider',
+      enabled: this.env.OPENPROVIDER_ENABLED,
+      baseUrl: this.env.OPENPROVIDER_BASE_URL,
+      usernamePresent: Boolean(this.env.OPENPROVIDER_USERNAME),
+      passwordPresent: Boolean(this.env.OPENPROVIDER_PASSWORD),
+    });
   }
   async onModuleDestroy() {
     await this.notifications.close();

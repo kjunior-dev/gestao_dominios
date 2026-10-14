@@ -44,13 +44,13 @@ describe('Security primitives', () => {
       }),
     ).toEqual({ role: 'MEMBER', count: 2 });
   });
-  it('rejects privilege injection and short passwords', () => {
+  it('rejects privilege injection and empty passwords', () => {
     expect(
       registerSchema.safeParse({
         firstName: 'A',
         lastName: 'B',
         email: 'a@example.test',
-        password: 'short',
+        password: '',
       }).success,
     ).toBe(false);
     expect(

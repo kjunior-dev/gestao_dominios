@@ -11,3 +11,9 @@ Adicione casos de uso nos módulos correspondentes, preserve contratos strict e 
 ## Openprovider
 
 Configure as variáveis exclusivamente em `.env` ou num gestor de segredos. `pnpm registrar:verify` é um smoke test de autenticação/disponibilidade de leitura; uma falha não deve ser substituída por um provider fictício. Veja [openprovider.md](openprovider.md) para requisitos e a discrepância documental de versões. Não execute integração e E2E em simultâneo usando `.env.test`.
+
+## Erros de arranque
+
+`pnpm dev` verifica a versão de Node e as portas configuradas antes de iniciar os serviços. Use `nvm install` e `nvm use` na raiz para selecionar `.nvmrc` (22.14.0); Node 26 não pertence ao intervalo suportado pelo projeto. Se usa uma configuração de execução do IDE, selecione também Node 22 nessa configuração.
+
+`EADDRINUSE` na porta 3000 ou 4000 indica outra execução ativa. Termine-a com Ctrl+C no terminal original; não execute dois `pnpm dev` para o mesmo projeto. Pode identificar processos com `lsof -nP -iTCP:3000 -iTCP:4000 -sTCP:LISTEN`. Quando o frontend falha, Turbo encerra os outros processos; a mensagem de tsx sobre force killing pode ser consequência desse encerramento. Não apague o lock de Next enquanto houver um servidor ativo.

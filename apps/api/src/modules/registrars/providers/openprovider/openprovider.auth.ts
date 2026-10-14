@@ -9,7 +9,7 @@ import {
 } from '../../../../common/crypto';
 import { RegistrarError } from '../../domain/registrar.types';
 import { OpenproviderClient } from './openprovider.client';
-import { z } from 'zod/v3';
+import { loginDataSchema } from './openprovider.types';
 @Injectable()
 export class OpenproviderAuth {
   constructor(
@@ -21,24 +21,66 @@ export class OpenproviderAuth {
     return (
       'op:auth:' +
       digest(
-        e.OPENPROVIDER_BASE_URL +
-          e.OPENPROVIDER_USERNAME +
+        JSON.stringify([
+          e.OPENPROVIDER_BASE_URL,
+          e.OPENPROVIDER_USERNAME,
           e.OPENPROVIDER_PASSWORD,
+          digest(e.TOTP_ENCRYPTION_KEY),
+        ]),
       )
     );
   }
+  private async cached(): Promise<string | null> {
+    const raw = await this.runtime.redis.get(this.key);
+    if (!raw) return null;
+    try {
+      return loginDataSchema.parse({
+        token: decrypt(raw, this.runtime.env.TOTP_ENCRYPTION_KEY, 'registrar'),
+      }).token;
+    } catch {
+      await this.remove(raw);
+      this.runtime.logger.warn({
+        event: 'registrar.token_cache',
+        status: 'corrupt',
+        provider: 'openprovider',
+      });
+      return null;
+    }
+  }
+  private async remove(raw: string) {
+    return this.runtime.redis.eval(
+      "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end;return 0",
+      1,
+      this.key,
+      raw,
+    );
+  }
+  async cacheStatus() {
+    return {
+      present: Boolean(await this.runtime.redis.exists(this.key)),
+      ttlSeconds: await this.runtime.redis.ttl(this.key),
+      lockPresent: Boolean(await this.runtime.redis.exists(this.key + ':lock')),
+    };
+  }
   async invalidate(token: string) {
     const raw = await this.runtime.redis.get(this.key);
-    if (
-      raw &&
-      decrypt(raw, this.runtime.env.TOTP_ENCRYPTION_KEY, 'registrar') === token
-    )
-      await this.runtime.redis.eval(
-        "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end;return 0",
-        1,
-        this.key,
-        raw,
-      );
+    if (!raw) return;
+    let matches = false;
+    try {
+      matches =
+        decrypt(raw, this.runtime.env.TOTP_ENCRYPTION_KEY, 'registrar') ===
+        token;
+    } catch {
+      matches = true;
+    }
+    if (matches) {
+      const removed = await this.remove(raw);
+      this.runtime.logger.info({
+        event: 'registrar.token_cache',
+        status: removed ? 'invalidated' : 'replaced',
+        provider: 'openprovider',
+      });
+    }
   }
   async token(): Promise<string> {
     if (!this.runtime.env.OPENPROVIDER_ENABLED)
@@ -47,17 +89,26 @@ export class OpenproviderAuth {
       lock = key + ':lock',
       owner = randomToken();
     for (let n = 0; n < 350; n++) {
-      const cached = await this.runtime.redis.get(key);
-      if (cached)
-        return decrypt(
-          cached,
-          this.runtime.env.TOTP_ENCRYPTION_KEY,
-          'registrar',
-        );
+      const cached = await this.cached();
+      if (cached) {
+        this.runtime.logger.info({
+          event: 'registrar.token_cache',
+          status: 'hit',
+          provider: 'openprovider',
+        });
+        return cached;
+      }
       if (await this.runtime.redis.set(lock, owner, 'PX', 100000, 'NX')) {
         try {
+          const existing = await this.cached();
+          if (existing) return existing;
+          this.runtime.logger.info({
+            event: 'registrar.token_cache',
+            status: 'miss',
+            provider: 'openprovider',
+          });
           const e = this.runtime.env;
-          const data = z.object({ token: z.string().min(1).max(10000) }).parse(
+          const data = loginDataSchema.parse(
             await this.client.send('/auth/login', 'POST', {
               username: e.OPENPROVIDER_USERNAME,
               password: e.OPENPROVIDER_PASSWORD,
@@ -69,6 +120,12 @@ export class OpenproviderAuth {
             'EX',
             e.OPENPROVIDER_TOKEN_TTL_SECONDS,
           );
+          this.runtime.logger.info({
+            event: 'registrar.token_cache',
+            status: 'stored',
+            ttlSeconds: e.OPENPROVIDER_TOKEN_TTL_SECONDS,
+            provider: 'openprovider',
+          });
           return data.token;
         } catch (error) {
           if (error instanceof RegistrarError) throw error;

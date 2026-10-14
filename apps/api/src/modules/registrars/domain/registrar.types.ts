@@ -29,10 +29,25 @@ export type SupportedTld = {
   supportsTransfer: boolean;
   supportsRenewal: boolean;
 };
+export type RegistrarDiagnostic = {
+  httpStatus?: number;
+  providerCode?: number;
+  operation?: string;
+  category?:
+    | 'credentials'
+    | 'authentication'
+    | 'token'
+    | 'permission'
+    | 'transient'
+    | 'response'
+    | 'rate_limit'
+    | 'configuration';
+};
 export class RegistrarError extends Error {
   constructor(
     readonly code: string,
     readonly transient = false,
+    readonly diagnostic: RegistrarDiagnostic = {},
   ) {
     super(code);
     this.name = 'RegistrarError';

@@ -50,3 +50,9 @@ Uma execução concorrente das suites de integração/E2E sofreu interferência 
 Docker Compose/builds de imagens não foram executados porque Docker CLI/daemon não estão disponíveis. O workflow GitHub Actions não foi executado remotamente nesta sessão.
 
 A Fase 2 **não é declarada integralmente concluída**: faltam autenticação, disponibilidade, catálogo e preços confirmados num ambiente externo oficial com acesso autorizado. A validação Docker pendente da Fase 1 permanece igualmente aberta.
+
+## Revisão de autenticação Openprovider — 13/10/2026
+
+Nesta revisão: `pnpm test` passou 48 testes; `pnpm test:integration` passou 68 (incluindo três novos testes com Redis real na base isolada 1). `pnpm typecheck` passou no monorepo e nos testes; ESLint da API e dos testes passou. O teste antigo que rejeitava passwords curtas foi ajustado para rejeitar passwords vazias, conforme a alteração anteriormente solicitada pelo utilizador. Não foram executados E2E nesta revisão de backend.
+
+`pnpm registrar:verify -- --auth-only` foi realmente executado contra produção: credenciais presentes, base oficial `/v1`, cache sem token (TTL -2) e sem lock. O login devolveu HTTP 500/código 196, agora classificado como PROVIDER_LOGIN_REJECTED, numa única tentativa. O comando terminou com exit code 1, como esperado perante essa rejeição. Não houve consulta, compra ou registo de domínios. A validade das credenciais e a autorização da conta continuam por confirmar no painel do fornecedor.
