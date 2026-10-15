@@ -67,6 +67,7 @@ model User {
   notifications      Notification[]
   carts              Cart[]
   domainSearches     DomainSearchLog[]
+  orders             Order[]
 
   @@index([status, globalRole])
 }
@@ -83,6 +84,10 @@ model Organization {
   updatedAt DateTime             @updatedAt
   members   OrganizationMember[]
   auditLogs AuditLog[]
+  orders    Order[]
+  contacts  DomainContact[]
+  domains   ManagedDomain[]
+  billing   BillingProfile?
 
   @@index([status])
 }
@@ -190,10 +195,12 @@ enum RegistrarStatus {
   DISABLED
 }
 
-enum DomainOperation {
+enum DomainOperationKind {
   REGISTER
   TRANSFER
   RENEW
+
+  @@map("DomainOperation")
 }
 
 enum MarginType {
@@ -209,17 +216,19 @@ enum CartStatus {
 }
 
 model Registrar {
-  id                     String          @id @default(uuid()) @db.Uuid
-  code                   String          @unique
+  id                     String                    @id @default(uuid()) @db.Uuid
+  code                   String                    @unique
   name                   String
-  status                 RegistrarStatus @default(DISABLED)
+  status                 RegistrarStatus           @default(DISABLED)
   configurationReference String
   lastSyncedAt           DateTime?
   lastErrorCode          String?
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
   tlds                   TldRegistrar[]
   prices                 TldPrice[]
+  registrations          DomainRegistration[]
+  contactMappings        RegistrarContactMapping[]
 }
 
 model Tld {
@@ -233,6 +242,7 @@ model Tld {
   registrars  TldRegistrar[]
   prices      TldPrice[]
   cartItems   CartItem[]
+  orderItems  OrderItem[]
 }
 
 model TldRegistrar {
@@ -246,6 +256,7 @@ model TldRegistrar {
   supportsRenewal      Boolean   @default(false)
   minimumPeriod        Int       @default(1)
   maximumPeriod        Int       @default(10)
+  registrationPolicy   Json      @default("{}")
   idnScript            String?
   lastSyncedAt         DateTime?
   tld                  Tld       @relation(fields: [tldId], references: [id], onDelete: Cascade)
@@ -256,26 +267,26 @@ model TldRegistrar {
 }
 
 model TldPrice {
-  id                     String          @id @default(uuid()) @db.Uuid
-  tldId                  String          @db.Uuid
-  registrarId            String          @db.Uuid
-  operation              DomainOperation @default(REGISTER)
+  id                     String              @id @default(uuid()) @db.Uuid
+  tldId                  String              @db.Uuid
+  registrarId            String              @db.Uuid
+  operation              DomainOperationKind @default(REGISTER)
   periodYears            Int
   supplierCurrency       String
-  currency               String          @default("CVE")
+  currency               String              @default("CVE")
   supplierCostMinor      BigInt
   sellingPriceMinor      BigInt
   marginType             MarginType
-  marginValue            Decimal         @db.Decimal(20, 8)
-  minimumPriceMinor      BigInt          @default(0)
-  additionalCostMinor    BigInt          @default(0)
-  roundingIncrementMinor BigInt          @default(1)
-  isActive               Boolean         @default(true)
-  effectiveFrom          DateTime        @default(now())
+  marginValue            Decimal             @db.Decimal(20, 8)
+  minimumPriceMinor      BigInt              @default(0)
+  additionalCostMinor    BigInt              @default(0)
+  roundingIncrementMinor BigInt              @default(1)
+  isActive               Boolean             @default(true)
+  effectiveFrom          DateTime            @default(now())
   effectiveUntil         DateTime
-  updatedAt              DateTime        @updatedAt
-  tld                    Tld             @relation(fields: [tldId], references: [id], onDelete: Restrict)
-  registrar              Registrar       @relation(fields: [registrarId], references: [id], onDelete: Restrict)
+  updatedAt              DateTime            @updatedAt
+  tld                    Tld                 @relation(fields: [tldId], references: [id], onDelete: Restrict)
+  registrar              Registrar           @relation(fields: [registrarId], references: [id], onDelete: Restrict)
 
   @@index([tldId, registrarId, operation, periodYears, isActive])
 }
@@ -327,22 +338,347 @@ model Cart {
 }
 
 model CartItem {
-  id                String          @id @default(uuid()) @db.Uuid
-  cartId            String          @db.Uuid
+  id                String              @id @default(uuid()) @db.Uuid
+  cartId            String              @db.Uuid
   domainName        String
-  tldId             String          @db.Uuid
+  tldId             String              @db.Uuid
   registrarCode     String
-  operation         DomainOperation @default(REGISTER)
+  operation         DomainOperationKind @default(REGISTER)
   registrationYears Int
   unitPriceMinor    BigInt
   currency          String
-  isPremium         Boolean         @default(false)
+  isPremium         Boolean             @default(false)
   quoteExpiresAt    DateTime
   priceSnapshot     Json
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  cart              Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  tld               Tld             @relation(fields: [tldId], references: [id], onDelete: Restrict)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  cart              Cart                @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  tld               Tld                 @relation(fields: [tldId], references: [id], onDelete: Restrict)
 
   @@unique([cartId, domainName, operation])
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PAYMENT_PROCESSING
+  PAID
+  PROVISIONING
+  COMPLETED
+  PARTIALLY_COMPLETED
+  FAILED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+  MANUAL_REVIEW
+}
+
+enum TransactionEnvironment {
+  MOCK
+  SANDBOX
+  LIVE
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  DECLINED
+  CANCELLED
+  UNKNOWN
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum RegistrationStatus {
+  READY
+  SUBMITTED
+  PENDING
+  UNKNOWN
+  COMPLETED
+  FAILED
+  MANUAL_REVIEW
+  BLOCKED
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  UNKNOWN
+}
+
+model BillingProfile {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @unique @db.Uuid
+  legalName      String
+  taxId          String?
+  address        String
+  city           String
+  postalCode     String
+  countryCode    String
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+
+model Order {
+  id              String                 @id @default(uuid()) @db.Uuid
+  orderNumber     String                 @unique
+  organizationId  String                 @db.Uuid
+  customerId      String                 @db.Uuid
+  status          OrderStatus            @default(PENDING_PAYMENT)
+  environment     TransactionEnvironment @default(MOCK)
+  idempotencyKey  String
+  requestHash     String
+  subtotalMinor   BigInt
+  feesMinor       BigInt                 @default(0)
+  discountMinor   BigInt                 @default(0)
+  taxMinor        BigInt                 @default(0)
+  totalMinor      BigInt
+  currency        String                 @default("CVE")
+  billingSnapshot Json
+  termsVersion    String
+  termsAcceptedAt DateTime
+  expiresAt       DateTime
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  customer        User                   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  items           OrderItem[]
+  payments        Payment[]
+  invoices        Invoice[]
+  transitions     OrderTransition[]
+
+  @@unique([customerId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id                String              @id @default(uuid()) @db.Uuid
+  orderId           String              @db.Uuid
+  tldId             String              @db.Uuid
+  domainContactId   String              @db.Uuid
+  domainName        String
+  operation         DomainOperationKind @default(REGISTER)
+  registrationYears Int
+  supplierCostMinor BigInt
+  supplierCurrency  String
+  salePriceMinor    BigInt
+  currency          String
+  quoteSnapshot     Json
+  nameservers       Json
+  isPremium         Boolean             @default(false)
+  premiumAccepted   Boolean             @default(false)
+  status            RegistrationStatus  @default(READY)
+  createdAt         DateTime            @default(now())
+  order             Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  tld               Tld                 @relation(fields: [tldId], references: [id], onDelete: Restrict)
+  contact           DomainContact       @relation(fields: [domainContactId], references: [id], onDelete: Restrict)
+  registration      DomainRegistration?
+  operations        DomainOperation[]
+
+  @@unique([orderId, domainName])
+}
+
+model OrderTransition {
+  id          String      @id @default(uuid()) @db.Uuid
+  orderId     String      @db.Uuid
+  fromStatus  OrderStatus
+  toStatus    OrderStatus
+  reason      String
+  actorUserId String?     @db.Uuid
+  createdAt   DateTime    @default(now())
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, createdAt])
+}
+
+model Payment {
+  id                String                 @id @default(uuid()) @db.Uuid
+  orderId           String                 @db.Uuid
+  provider          String
+  providerPaymentId String?                @unique
+  amountMinor       BigInt
+  currency          String
+  environment       TransactionEnvironment
+  status            PaymentStatus          @default(PENDING)
+  paidAt            DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  order             Order                  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  events            PaymentEvent[]
+  refunds           Refund[]
+
+  @@unique([orderId, provider])
+  @@index([status, createdAt])
+}
+
+model PaymentEvent {
+  id              String    @id @default(uuid()) @db.Uuid
+  paymentId       String    @db.Uuid
+  provider        String
+  providerEventId String
+  eventType       String
+  verified        Boolean
+  payloadHash     String
+  payload         Json
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  payment         Payment   @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerEventId])
+  @@index([processedAt, createdAt])
+}
+
+model DomainContact {
+  id               String                    @id @default(uuid()) @db.Uuid
+  organizationId   String                    @db.Uuid
+  firstName        String
+  lastName         String
+  companyName      String?
+  email            String
+  phone            String
+  phoneCountryCode String
+  address          String
+  addressNumber    String
+  city             String
+  region           String?
+  postalCode       String
+  countryCode      String
+  contactType      String                    @default("OWNER")
+  createdAt        DateTime                  @default(now())
+  organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  mappings         RegistrarContactMapping[]
+  items            OrderItem[]
+
+  @@index([organizationId])
+}
+
+model RegistrarContactMapping {
+  id              String             @id @default(uuid()) @db.Uuid
+  registrarId     String             @db.Uuid
+  domainContactId String             @db.Uuid
+  externalHandle  String?
+  status          RegistrationStatus @default(READY)
+  createdAt       DateTime           @default(now())
+  registrar       Registrar          @relation(fields: [registrarId], references: [id], onDelete: Restrict)
+  contact         DomainContact      @relation(fields: [domainContactId], references: [id], onDelete: Restrict)
+
+  @@unique([registrarId, domainContactId])
+}
+
+model DomainRegistration {
+  id                     String             @id @default(uuid()) @db.Uuid
+  orderItemId            String             @unique @db.Uuid
+  domainId               String?            @unique @db.Uuid
+  registrarId            String             @db.Uuid
+  externalRegistrationId String?
+  status                 RegistrationStatus @default(READY)
+  attemptCount           Int                @default(0)
+  idempotencyKey         String             @unique
+  lastErrorCode          String?
+  requestedAt            DateTime           @default(now())
+  completedAt            DateTime?
+  item                   OrderItem          @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  registrar              Registrar          @relation(fields: [registrarId], references: [id], onDelete: Restrict)
+  domain                 ManagedDomain?     @relation(fields: [domainId], references: [id], onDelete: Restrict)
+
+  @@unique([registrarId, externalRegistrationId])
+  @@index([status, requestedAt])
+}
+
+model ManagedDomain {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @db.Uuid
+  domainName     String
+  environment    TransactionEnvironment
+  status         String
+  registeredAt   DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime               @default(now())
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  registration   DomainRegistration?
+
+  @@unique([domainName, environment])
+  @@index([organizationId])
+}
+
+model DomainOperation {
+  id                String             @id @default(uuid()) @db.Uuid
+  orderItemId       String             @db.Uuid
+  operationType     String
+  status            RegistrationStatus @default(READY)
+  idempotencyKey    String             @unique
+  externalReference String?
+  attemptCount      Int                @default(0)
+  lastError         String?
+  createdAt         DateTime           @default(now())
+  completedAt       DateTime?
+  item              OrderItem          @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@map("DomainExecution")
+}
+
+model Invoice {
+  id            String   @id @default(uuid()) @db.Uuid
+  orderId       String   @unique @db.Uuid
+  invoiceNumber String   @unique
+  status        String   @default("INTERNAL")
+  subtotalMinor BigInt
+  taxMinor      BigInt
+  totalMinor    BigInt
+  currency      String
+  issuedAt      DateTime
+  createdAt     DateTime @default(now())
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+}
+
+model Refund {
+  id               String       @id @default(uuid()) @db.Uuid
+  paymentId        String       @db.Uuid
+  idempotencyKey   String
+  amountMinor      BigInt
+  currency         String
+  reason           String
+  status           RefundStatus @default(REQUESTED)
+  providerRefundId String?      @unique
+  requestedBy      String       @db.Uuid
+  approvedBy       String?      @db.Uuid
+  approvedAt       DateTime?
+  createdAt        DateTime     @default(now())
+  payment          Payment      @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, idempotencyKey])
+  @@index([status, createdAt])
+}
+
+model CommerceOutbox {
+  id               String    @id @default(uuid()) @db.Uuid
+  topic            String
+  deduplicationKey String    @unique
+  payload          Json
+  publishedAt      DateTime?
+  completedAt      DateTime?
+  attempts         Int       @default(0)
+  lastErrorCode    String?
+  createdAt        DateTime  @default(now())
+
+  @@index([publishedAt, createdAt])
+}
+
+model LiveApproval {
+  id                String    @id @default(uuid()) @db.Uuid
+  requestedBy       String    @db.Uuid
+  approvedBy        String?   @db.Uuid
+  reason            String
+  configurationHash String
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@index([expiresAt, revokedAt])
 }

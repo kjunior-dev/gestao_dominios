@@ -23,3 +23,7 @@ Não há credenciais administrativas fixas. O seed usa SEED_PASSWORD e só cria 
 ## Migração comercial Fase 2
 
 202610130002_commerce adiciona Registrar, Tld, TldRegistrar (N:N), TldPrice (versionado), ExchangeRate, DomainSearchLog, Cart e CartItem. Relações, constraints e política financeira: [TLDs](tlds.md), [preços](pricing.md), [carrinho](cart.md). Nenhuma tabela da Fase 1 é removida. O seed não ativa serviços comerciais ou inventa taxas/preços.
+
+## Migração comercial da Fase 3
+
+Order, OrderItem, OrderTransition, Payment, PaymentEvent, DomainContact, RegistrarContactMapping, DomainRegistration, ManagedDomain, DomainExecution (modelo Prisma DomainOperation), Invoice, Refund, BillingProfile, CommerceOutbox e LiveApproval. Valores financeiros usam BigInt; snapshots de conversão preservam Decimal como strings. Constraints SQL impedem totais negativos, total incoerente, períodos inválidos e reembolsos não positivos. Referências financeiras usam onDelete Restrict. Eventos e intenções têm constraints únicas de deduplicação.

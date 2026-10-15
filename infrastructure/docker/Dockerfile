@@ -3,7 +3,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
 RUN corepack enable && corepack prepare pnpm@9.15.2 --activate
 WORKDIR /app
 COPY . .
-RUN pnpm install --frozen-lockfile && pnpm db:generate && pnpm --filter @devtrust/contracts build && pnpm --filter @devtrust/database build
+RUN pnpm install --frozen-lockfile && pnpm db:generate && pnpm exec turbo run build --filter=@devtrust/commerce
 FROM base AS development
 CMD ["pnpm", "dev"]
 FROM base AS production

@@ -42,3 +42,9 @@ Domínios, registradores, preços, encomendas e pagamentos têm módulos sem end
 ## Fase 2
 
 DomainsModule coordena catálogo ativo, normalização, AvailabilityCache e RegistrarRegistry. RegistrarsModule contém a porta interna e o adaptador Openprovider. PricingModule coordena política versionada e ExchangeRateProvider manual. CatalogModule fornece administração auditada. CartModule mantém identidade/persistência e revalida através de DomainsModule; AuthModule associa o carrinho após login. Os módulos continuam no mesmo NestJS, sem microserviços. O worker existente acrescenta manutenção de retenção. Nenhum provider fictício integra o runtime da aplicação.
+
+## Comércio na Fase 3
+
+O monólito modular mantém API REST e worker separado. `packages/commerce` contém estados, contratos de gateways, processamento idempotente, outbox e documentos. `packages/registrars` contém transporte/cache de autenticação partilhados com o worker; os ficheiros Nest existentes mantêm fachadas com DI. Não foram introduzidos microserviços. O módulo Commerce fornece serviços de autorização, checkout, pagamentos, reembolsos e documentos aos controllers de cada domínio.
+
+Intenções são persistidas antes de efeitos externos. Jobs são repetíveis e resultados incertos exigem consulta ao fornecedor. As barreiras de ambiente são verificadas no backend e no transporte de escrita; credenciais isoladamente não permitem uma compra.

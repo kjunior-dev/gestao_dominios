@@ -15,3 +15,6 @@ test-results
 
 # Private local configuration alias
 env
+
+**/.next-e2e/
+**/.next-build/

@@ -1,3 +1,11 @@
+import { BillingModule } from './modules/billing/billing.module';
+import { OrderItemsModule } from './modules/order-items/order-items.module';
+import { CommerceModule } from './modules/checkout/commerce.module';
+import { CheckoutModule } from './modules/checkout/checkout.module';
+import { RefundsModule } from './modules/refunds/refunds.module';
+import { InvoicesModule } from './modules/invoices/invoices.module';
+import { DomainContactsModule } from './modules/domain-contacts/domain-contacts.module';
+import { DomainRegistrationModule } from './modules/domain-registration/domain-registration.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CartModule } from './modules/cart/cart.module';
 import { Module } from '@nestjs/common';
@@ -23,6 +31,15 @@ import { PaymentsModule } from './modules/payments/payments.module';
 @Module({
   imports: [
     CoreModule,
+    BillingModule,
+    OrderItemsModule,
+    CommerceModule,
+    CheckoutModule,
+    RefundsModule,
+    InvoicesModule,
+    DomainContactsModule,
+    DomainRegistrationModule,
+
     CatalogModule,
     CartModule,
     AuthModule,

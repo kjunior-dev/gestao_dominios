@@ -1,5 +1,6 @@
+import { commerceEnvironmentSchema } from '@devtrust/commerce';
 import { z } from 'zod/v3';
-export const environmentSchema = z.object({
+export const environmentSchema = commerceEnvironmentSchema.extend({
   OPENPROVIDER_ENABLED: z
     .enum(['true', 'false'])
     .default('false')

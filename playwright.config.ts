@@ -35,6 +35,7 @@ export default defineConfig({
     {
       command:
         'pnpm --filter @devtrust/web exec next dev --port 3300 --hostname localhost',
+      env: { NEXT_OUTPUT_DIR: '.next-e2e' },
       url: 'http://localhost:3300',
       reuseExistingServer: false,
       timeout: 120000,

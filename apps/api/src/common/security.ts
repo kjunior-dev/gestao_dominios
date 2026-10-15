@@ -20,6 +20,7 @@ export const HealthProbe = () => SetMetadata('healthProbe', true);
 export const AccountScoped = () => SetMetadata('scope', 'self');
 export const OrganizationScoped = () => SetMetadata('scope', 'organization');
 export const OptionalAccount = () => SetMetadata('optionalAccount', true);
+export const PaymentWebhook = () => SetMetadata('paymentWebhook', true);
 export const Public = () => SetMetadata('public', true);
 export const EnrollmentAllowed = () => SetMetadata('enrollment', true);
 export const RequirePermission = (permission: Permission) =>
@@ -39,8 +40,12 @@ export class SecurityGuard implements CanActivate {
     const handlers = [context.getHandler(), context.getClass()];
     if (this.reflector.getAllAndOverride<boolean>('healthProbe', handlers))
       return true;
+    const webhook = this.reflector.getAllAndOverride<boolean>(
+      'paymentWebhook',
+      handlers,
+    );
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
-    if (mutation && req.headers.origin !== this.runtime.env.APP_URL)
+    if (mutation && !webhook && req.headers.origin !== this.runtime.env.APP_URL)
       throw new ForbiddenException('Origem do pedido inválida');
     const ip = req.ip || 'unknown',
       auth = mutation && req.path.includes('/auth/');
@@ -53,6 +58,7 @@ export class SecurityGuard implements CanActivate {
     )) as number;
     if (count > (auth ? 30 : 180))
       throw new HttpException('Demasiados pedidos. Tente mais tarde.', 429);
+    if (webhook) return true; // Signature verification is mandatory in the webhook controller.
     if (this.reflector.getAllAndOverride<boolean>('public', handlers))
       return true;
     const token = (req.cookies as Record<string, string> | undefined)?.[

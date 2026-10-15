@@ -26,6 +26,11 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 15
     env:
       NODE_ENV: test
+      PAYMENTS_MODE: mock
+      DOMAIN_REGISTRATION_MODE: mock
+      LIVE_TRANSACTIONS_ENABLED: 'false'
+      BILLING_MODE: internal
+      EMAIL_MODE: development
       DATABASE_URL: postgresql://devtrust:ci_local_only@localhost:5432/devtrust_test
       REDIS_URL: redis://localhost:6379/1
       APP_URL: http://localhost:3300

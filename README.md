@@ -120,3 +120,26 @@ No painel, SUPER_ADMIN com MFA pode sincronizar o catálogo em `/admin/registrar
 Pesquise em `/dominios/pesquisar`; consulte `/dominios/precos` e `/carrinho`. O carrinho persiste para visitantes e contas, é associado após login e revalida disponibilidade/preço no servidor. `/dashboard/dominios` e `/dashboard/encomendas` continuam vazios porque não são efetuadas compras.
 
 [Pesquisa](docs/domain-search.md) · [Registradores](docs/registrar-integration.md) · [Openprovider](docs/openprovider.md) · [TLDs](docs/tlds.md) · [Preços](docs/pricing.md) · [Câmbio](docs/currency.md) · [Carrinho](docs/cart.md) · [Testes Fase 2](docs/phase-2-testing.md).
+
+## Fase 3 — fluxo comercial em desenvolvimento
+
+Checkout, encomendas, pagamentos mock, eventos assinados, outbox, registos/reconciliação, reembolsos e comprovativos internos foram acrescentados. A migração `20261014140000_commerce_checkout` é aditiva e preserva dados das fases anteriores. O enum PostgreSQL `DomainOperation` foi preservado; a nova entidade de operações usa a tabela `DomainExecution`.
+
+```env
+PAYMENTS_MODE=mock
+DOMAIN_REGISTRATION_MODE=disabled
+LIVE_TRANSACTIONS_ENABLED=false
+BILLING_MODE=internal
+EMAIL_MODE=development
+BILLING_TAX_BASIS_POINTS=0
+```
+
+`pnpm install`, `pnpm db:migrate` e `pnpm dev` preparam e iniciam o ambiente. `npm run dev` também seleciona Node 22 instalado, mesmo quando o IDE usa outra versão. Na configuração local, a loja fica em `http://localhost:3001`. Não inicie duas execuções nas mesmas portas.
+
+Em testes isolados, DOMAIN_REGISTRATION_MODE=mock permite completar a simulação, claramente identificada. O modo disabled preserva a encomenda paga em análise manual, sem comprar domínios. Sandbox requer base/conta próprias e verificação oficial; não altere as credenciais de produção para testar. Vendas reais continuam bloqueadas por ausência de gateway aprovado, mesmo com flags ou aprovação administrativa.
+
+Páginas: `/checkout`, `/checkout/confirmacao`, `/checkout/resultado/[orderId]`; `/dashboard/encomendas`, `/dashboard/pagamentos`, `/dashboard/faturas`, `/dashboard/dominios`; `/admin/vendas`, `/admin/encomendas`, `/admin/pagamentos`, `/admin/registos`, `/admin/reembolsos`, `/admin/faturacao`, `/admin/operacoes`.
+
+[Checkout](docs/checkout.md) · [Pagamentos](docs/payments.md) · [Webhooks](docs/payment-webhooks.md) · [Registos](docs/domain-registration.md) · [Contactos](docs/domain-contacts.md) · [Estados](docs/order-lifecycle.md) · [Reconciliação](docs/reconciliation.md) · [Reembolsos](docs/refunds.md) · [Documentos internos](docs/billing.md) · [Produção](docs/production-readiness.md) · [Testes](docs/phase-3-testing.md).
+
+Testes E2E usam `.next-e2e` para preservar um servidor de desenvolvimento ativo. Para verificar build sem partilhar artefactos com `next dev`, use `NEXT_OUTPUT_DIR=.next-build pnpm build`; esse build requer a mesma variável ao iniciar o frontend com `next start`. O arranque normal continua a usar `.next`.

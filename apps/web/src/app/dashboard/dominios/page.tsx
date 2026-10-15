@@ -1,14 +1,4 @@
-import { Card, PageHeader, EmptyState } from '@devtrust/ui';
+import { FinanceList } from '@/features/transactions/finance-list';
 export default function Page() {
-  return (
-    <>
-      <PageHeader title="Os seus domínios" />
-      <Card>
-        <EmptyState
-          title="Sem registos"
-          description="Ainda não existem registos de domínios. Pesquise um nome para preparar o carrinho."
-        />
-      </Card>
-    </>
-  );
+  return <FinanceList kind="domains" admin={false} />;
 }

@@ -24,6 +24,8 @@ x-app: &app
     - database_modules:/app/packages/database/node_modules
     - contracts_modules:/app/packages/contracts/node_modules
     - ui_modules:/app/packages/ui/node_modules
+    - commerce_modules:/app/packages/commerce/node_modules
+    - registrars_modules:/app/packages/registrars/node_modules
     - mailbox:/app/.local/mailbox
   networks: [backend, edge]
 services:
@@ -58,7 +60,7 @@ services:
       [
         sh,
         -c,
-        'pnpm --filter @devtrust/contracts build && pnpm --filter @devtrust/database build && pnpm --filter @devtrust/database migrate',
+        'pnpm exec turbo run build --filter=@devtrust/commerce && pnpm --filter @devtrust/database migrate',
       ]
     depends_on:
       postgres: { condition: service_healthy }
@@ -119,6 +121,8 @@ volumes:
   database_modules:
   contracts_modules:
   ui_modules:
+  commerce_modules:
+  registrars_modules:
 networks:
   backend: { internal: true }
   edge:

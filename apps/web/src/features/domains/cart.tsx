@@ -56,7 +56,7 @@ export function ShoppingCart() {
     <>
       <PageHeader
         title="O seu carrinho"
-        description="Cotações temporárias. Não existe checkout ou compra de domínios nesta fase."
+        description="Cotações temporárias. Confirme dados, preço e disponibilidade no checkout."
       />
       {error && (
         <div role="alert" className="message error">
@@ -162,13 +162,16 @@ export function ShoppingCart() {
               {cart.requiresRevalidation && (
                 <p role="status" className="error">
                   Existem cotações expiradas. Revalide os itens antes de avançar
-                  numa fase futura.
+                  no checkout.
                 </p>
               )}
               <p>
                 Este carrinho não garante disponibilidade. Não foi efetuado
                 qualquer registo ou pagamento.
               </p>
+              <Button asChild disabled={cart.requiresRevalidation}>
+                <Link href="/checkout">Continuar para checkout</Link>
+              </Button>
               <ConfirmDialog
                 title="Limpar carrinho?"
                 description="Todos os itens serão removidos."

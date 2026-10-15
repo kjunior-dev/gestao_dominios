@@ -159,6 +159,12 @@ export const permissions = [
   'pricing.manage',
   'system.manage',
   'audit.read',
+  'payments.read',
+  'payments.manage',
+  'refunds.approve',
+  'billing.manage',
+  'registrations.manage',
+  'operations.manage',
 ] as const;
 export type Permission = (typeof permissions)[number];
 export const globalPermissions: Record<
@@ -196,3 +202,4 @@ export const organizationPermissions: Record<
 };
 
 export * from './commerce';
+export * from './transactions';

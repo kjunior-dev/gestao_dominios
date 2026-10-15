@@ -7,7 +7,7 @@
     "node": ">=22.14.0 <23"
   },
   "scripts": {
-    "dev": "dotenv -e .env -- sh -c \"node scripts/check-dev.mjs && turbo dev\"",
+    "dev": "node scripts/dev.mjs",
     "build": "turbo build",
     "lint": "turbo lint && eslint tests *.config.ts",
     "typecheck": "turbo typecheck && tsc --noEmit",

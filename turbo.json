@@ -3,8 +3,14 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
-      "env": ["API_INTERNAL_URL"]
+      "outputs": [
+        "dist/**",
+        ".next/**",
+        "!.next/cache/**",
+        ".next-build/**",
+        "!.next-build/cache/**"
+      ],
+      "env": ["API_INTERNAL_URL", "NEXT_OUTPUT_DIR"]
     },
     "dev": {
       "cache": false,
@@ -25,7 +31,15 @@
         "DOMAIN_*",
         "CART_TTL_HOURS",
         "QUOTE_TTL_SECONDS",
-        "EXCHANGE_RATE_PROVIDER"
+        "EXCHANGE_RATE_PROVIDER",
+        "PAYMENTS_MODE",
+        "LIVE_TRANSACTIONS_ENABLED",
+        "DOMAIN_REGISTRATION_MODE",
+        "BILLING_MODE",
+        "EMAIL_MODE",
+        "MOCK_WEBHOOK_SECRET",
+        "BILLING_TAX_BASIS_POINTS",
+        "CHECKOUT_TERMS_VERSION"
       ]
     },
     "typecheck": {

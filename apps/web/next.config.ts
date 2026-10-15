@@ -1,5 +1,9 @@
 import type { NextConfig } from 'next';
+const output = process.env.NEXT_OUTPUT_DIR || '.next';
+if (!['.next', '.next-e2e', '.next-build'].includes(output))
+  throw new Error('NEXT_OUTPUT_DIR must be .next, .next-e2e or .next-build');
 const config: NextConfig = {
+  distDir: output,
   logging: {
     incomingRequests: false,
     browserToTerminal: false,

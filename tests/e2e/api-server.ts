@@ -36,6 +36,10 @@ async function main() {
             isActive: true,
             supportsRegistration: true,
             maximumPeriod: 3,
+            registrationPolicy: {
+              approved: true,
+              requiresAdditionalData: false,
+            },
           },
         },
       },

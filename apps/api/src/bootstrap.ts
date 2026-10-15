@@ -10,6 +10,7 @@ import { ErrorFilter } from './common/error.filter';
 export async function createApp() {
   const app = await NestFactory.create(AppModule, {
     logger: false,
+    rawBody: true,
     abortOnError: false,
   });
   const runtime = app.get(RuntimeService);
@@ -38,7 +39,11 @@ export async function createApp() {
   const publicPaths = new Set(
     ['register', 'login', 'forgot-password', 'reset-password', 'verify-email']
       .map((path) => '/api/v1/auth/' + path)
-      .concat(['/api/v1/tlds', '/api/v1/domains/check']),
+      .concat([
+        '/api/v1/tlds',
+        '/api/v1/domains/check',
+        '/api/v1/payments/webhooks/{provider}',
+      ]),
   );
   for (const [path, item] of Object.entries(document.paths)) {
     for (const [method, operation] of Object.entries(item || {})) {

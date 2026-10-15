@@ -56,3 +56,21 @@ Não existem endpoints de registo real de domínios, pagamento ou DNS.
 | GET           | /admin/domain-search/logs           | audit.read; paginação/pesquisa       |
 
 Visitantes inicializam o carrinho via GET antes de mutações e usam X-Cart-CSRF-Token. Autenticados usam X-CSRF-Token. Ambos exigem Origin. Documentação OpenAPI inclui schemas partilhados e autenticação opcional do carrinho. Referências detalhadas em domain-search.md, pricing.md e cart.md.
+
+## API comercial /api/v1
+
+- Checkout: POST /checkout; GET /checkout/config e /checkout/:id.
+- Encomendas: GET /orders e /orders/:id.
+- Pagamentos: POST /payments; GET /payments e /payments/:id; POST /payments/:id/mock-confirm; POST /payments/webhooks/:provider.
+- Contactos: GET /domain-contacts?organizationId=UUID; POST /domain-contacts.
+- Domínios geridos: GET /domains e /domains/:id (pesquisa /domains/check preservada).
+- Documentos: GET /invoices, /invoices/:id e /invoices/:id/pdf.
+- Reembolsos: POST /refunds; GET /refunds/:id.
+- Administração: GET /admin/orders, /admin/orders/:id, /admin/payments, /admin/registrations, /admin/refunds, /admin/invoices, /admin/operations e /admin/sales.
+- Decisões auditadas: POST /admin/refunds/:id/decision, /admin/operations/:id/retry e /admin/registrations/:id/resume; PATCH /admin/tlds/:id/registration-policy.
+- Preparação de produção: POST /admin/live-approvals e /admin/live-approvals/:id/approve (não habilitam gateway real).
+- Pré-visualização protegida: GET /admin/notifications/preview/:type.
+
+Swagger descreve schemas dos pedidos. Webhooks são autenticados por assinatura e timestamp, sem cookie/CSRF; os restantes pedidos de alteração mantêm Origin/CSRF e permissões. O cliente nunca pode fornecer preços, hashes de verificação, estado de pagamento ou flags de produção.
+
+Dados fiscais por organização: GET /billing?organizationId=UUID e PATCH /billing?organizationId=UUID. Linhas de encomenda: GET /orders/:orderId/items. Pré-visualização HTML/texto de templates: /admin/notificacoes/templates (desenvolvimento, SUPER_ADMIN). Reembolsos do cliente também constam do detalhe autorizado da encomenda.

@@ -1,3 +1,4 @@
+import { CommerceError } from '@devtrust/commerce';
 import { Inject } from '@nestjs/common';
 import {
   ArgumentsHost,
@@ -16,7 +17,10 @@ export class ErrorFilter implements ExceptionFilter {
     let status = 500,
       message = 'Ocorreu um erro interno',
       fields: unknown;
-    if (error instanceof HttpException) {
+    if (error instanceof CommerceError) {
+      status = error.status;
+      message = error.code;
+    } else if (error instanceof HttpException) {
       status = error.getStatus();
       const body = error.getResponse();
       message =

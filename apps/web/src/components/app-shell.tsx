@@ -55,6 +55,13 @@ export function AppShell({
         ['/admin/tlds', 'Extensões', Building2],
         ['/admin/pricing', 'Preços e câmbio', Settings],
         ['/admin/registrars', 'Registradores', ShieldCheck],
+        ['/admin/vendas', 'Vendas', ScrollText],
+        ['/admin/encomendas', 'Encomendas', ScrollText],
+        ['/admin/pagamentos', 'Pagamentos', ScrollText],
+        ['/admin/registos', 'Registos', Building2],
+        ['/admin/reembolsos', 'Reembolsos', ScrollText],
+        ['/admin/faturacao', 'Comprovativos', ScrollText],
+        ['/admin/operacoes', 'Operações', Settings],
         ['/admin/auditoria', 'Auditoria', ScrollText],
         ['/admin/definicoes', 'Definições', Settings],
       ] as const)
@@ -63,6 +70,8 @@ export function AppShell({
         ['/dashboard/carrinho', 'Carrinho', Building2],
         ['/dashboard/dominios', 'Domínios', Building2],
         ['/dashboard/encomendas', 'Encomendas', ScrollText],
+        ['/dashboard/pagamentos', 'Pagamentos', ScrollText],
+        ['/dashboard/faturas', 'Comprovativos', ScrollText],
         ['/dashboard/perfil', 'O meu perfil', UserRound],
         ['/dashboard/seguranca', 'Segurança', ShieldCheck],
         ['/dashboard/organizacao', 'Organização', Building2],
@@ -86,6 +95,32 @@ export function AppShell({
         </span>
         <nav aria-label="Painel">
           {nav
+            .filter(
+              ([href]) =>
+                !admin ||
+                ![
+                  '/admin/vendas',
+                  '/admin/encomendas',
+                  '/admin/pagamentos',
+                  '/admin/registos',
+                  '/admin/reembolsos',
+                  '/admin/faturacao',
+                  '/admin/operacoes',
+                ].includes(href) ||
+                globalPermissions[user.globalRole].includes(
+                  href === '/admin/encomendas'
+                    ? 'orders.read'
+                    : href === '/admin/registos'
+                      ? 'domains.manage'
+                      : href === '/admin/reembolsos'
+                        ? 'refunds.approve'
+                        : href === '/admin/faturacao'
+                          ? 'billing.manage'
+                          : href === '/admin/operacoes'
+                            ? 'operations.manage'
+                            : 'payments.read',
+                ),
+            )
             .filter(
               ([href]) =>
                 !admin ||

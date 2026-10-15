@@ -1,0 +1,17 @@
+# Registo de domínios
+
+DOMAIN_REGISTRATION_MODE=disabled é o padrão. Mock é permitido apenas fora de produção e produz ManagedDomain.environment=MOCK, apresentado explicitamente como simulação. Sandbox exige configuração explícita, base https://api.sandbox.openprovider.nl/v1beta, uma encomenda SANDBOX e OPENPROVIDER_SANDBOX_CONTRACT_VERIFIED=true após verificação do contrato oficial desse ambiente. Por padrão, essa confirmação é false e o transporte recusa escrita sandbox. Os mocks contratuais ativam-na apenas em memória para testar o mapeamento, sem validar o fornecedor real. Nenhuma chamada de escrita externa foi executada nesta entrega.
+
+O cliente partilhado @devtrust/registrars preserva cache cifrada, rate limit, logs sanitizados, timeout e renovação limitada dos pedidos de leitura. API e worker usam o mesmo contrato. Escritas /customers e /domains exigem permissão interna e configuração de ambiente; fazem apenas uma tentativa, incluindo falhas de rede. Live permanece bloqueado pela ausência de gateway real aprovado.
+
+Contratos verificados no [OpenAPI oficial](https://developer.openprovider.com/data/swagger.json): POST /v1/customers, POST /v1/domains, GET /v1/domains/{id}, GET /v1/domains com full_name. Nomes e handles são mapeados, autorenew fica off, serviços adicionais ficam desligados. O comentário guarda a intenção interna; a reconciliação exige correspondência exata entre domínio e esse comentário. A versão sandbox não foi validada ao vivo; a existência dos contratos de produção não garante equivalência.
+
+Um TLD exige política explicitamente aprovada e confirmação de que não necessita dados adicionais. Caso contrário, vai para análise manual. Há contactos imutáveis, mapeamento único por registrador, limites de período e nameservers validados. Exigências específicas não modeladas devem permanecer manuais.
+
+Imediatamente antes do POST de registo, disponibilidade e custo são consultados de novo. Moeda diferente, premium inesperado ou custo acima do limite autorizado bloqueiam a operação. Premium exige aceitação explícita no checkout e o limite fica no snapshot. A taxa premium é serializada como número decimal JSON exato, sem conversão para floating point.
+
+A intenção SUBMITTED e o contador são gravados antes da chamada. Há lock Redis, claim PostgreSQL e unicidade de intenção/linha/referência externa. Timeout, rejeição ou falha de persistência após o POST não provocam outra compra: consultam-se estado ou domínio existente. Sem correspondência conclusiva, MANUAL_REVIEW. Só ACT confirmado cria um domínio ACTIVE e conclui a linha. PENDING não significa sucesso.
+
+Códigos documentados 310/920 (saldo), 311 (domínio ocupado), 330–335 (handles) e 308/309 (contrato) são classificados como rejeições permanentes, mesmo quando encapsulados em HTTP 500. Não se repetem essas operações nem se afirma que um reembolso ocorreu. [Códigos oficiais](https://support.openprovider.eu/hc/en-us/articles/216644928-API-Error-Codes).
+
+O endpoint publicado não possui um limite geral de custo para registos comuns. A consulta imediatamente anterior reduz o intervalo de risco, mas não representa uma garantia atómica do fornecedor. Antes de produção é necessário confirmar garantias comerciais e reconciliar custos efetivamente debitados; as operações live continuam bloqueadas. Para premium, a taxa aceita é enviada explicitamente, em decimal exato, dentro do limite autorizado.

@@ -1,3 +1,4 @@
+import { notificationTemplate } from '@devtrust/commerce';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createDecipheriv } from 'node:crypto';
@@ -43,6 +44,11 @@ export async function processNotification(
       to: notification.user.email,
       subject: notification.subject,
       ...content,
+      ...notificationTemplate(
+        notification.type,
+        notification.subject,
+        (content as { link?: string }).link,
+      ),
     }),
     { mode: 0o600 },
   );

@@ -299,12 +299,15 @@ export class CartService {
   }
   async remove(req: AuthRequest, itemId?: string) {
     const cart = await this.resolve(req, undefined, true);
-    if (itemId) {
-      const deleted = await this.db.cartItem.deleteMany({
-        where: { id: itemId, cartId: cart.id },
-      });
-      if (!deleted.count) throw new NotFoundException('Item não encontrado');
-    } else await this.db.cartItem.deleteMany({ where: { cartId: cart.id } });
+    await this.db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${cart.id},0))`;
+      if (itemId) {
+        const deleted = await tx.cartItem.deleteMany({
+          where: { id: itemId, cartId: cart.id },
+        });
+        if (!deleted.count) throw new NotFoundException('Item não encontrado');
+      } else await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+    });
     return this.view(cart.id);
   }
 }
