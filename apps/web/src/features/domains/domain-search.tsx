@@ -36,7 +36,15 @@ export function DomainSearch() {
     [error, setError] = useState(''),
     [adding, setAdding] = useState(''),
     [catalogError, setCatalogError] = useState(''),
-    [catalogRevision, setCatalogRevision] = useState(0);
+    [catalogRevision, setCatalogRevision] = useState(0),
+    [premiumAccepted, setPremiumAccepted] = useState<Record<string, boolean>>(
+      {},
+    ),
+    [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
   const {
     register,
     handleSubmit,
@@ -79,6 +87,7 @@ export function DomainSearch() {
           if (!canSearch) return;
           setError('');
           setResults(null);
+          setPremiumAccepted({});
           try {
             const body = domainCheckSchema.parse({
               ...values,
@@ -179,7 +188,12 @@ export function DomainSearch() {
       {results && (
         <div className="search-results" aria-live="polite">
           {results.map((result) => (
-            <Card key={result.domainName} className="domain-result">
+            <Card
+              key={result.domainName}
+              className="domain-result"
+              role="region"
+              aria-label={'Resultado para ' + result.domainName}
+            >
               <div>
                 <h3>{result.domainName}</h3>
                 <div className="actions">
@@ -223,12 +237,37 @@ export function DomainSearch() {
                     </p>
                   </>
                 ) : (
-                  <p>Sem preço confirmado</p>
+                  <p>Preço indisponível</p>
+                )}
+                {result.quote &&
+                  new Date(result.quote.expiresAt).getTime() <= now && (
+                    <p role="status">Cotação expirada. Pesquise novamente.</p>
+                  )}
+                {result.isPremium && result.quote && (
+                  <label>
+                    <Checkbox
+                      checked={premiumAccepted[result.domainName] ?? false}
+                      onChange={(e) =>
+                        setPremiumAccepted((v) => ({
+                          ...v,
+                          [result.domainName]: e.target.checked,
+                        }))
+                      }
+                    />
+                    Aceito o valor premium de{' '}
+                    {formatMoney(
+                      result.quote.priceMinor,
+                      result.quote.currency,
+                    )}{' '}
+                    por {result.quote.periodYears} ano(s)
+                  </label>
                 )}
                 <Button
                   disabled={
                     result.status !== 'AVAILABLE' ||
                     !result.quote ||
+                    new Date(result.quote.expiresAt).getTime() <= now ||
+                    (result.isPremium && !premiumAccepted[result.domainName]) ||
                     Boolean(adding)
                   }
                   onClick={async () => {
@@ -238,6 +277,10 @@ export function DomainSearch() {
                       await mutate('/cart/items', {
                         domainName: result.domainName,
                         registrationYears: result.quote!.periodYears,
+                        quoteToken: result.quote!.quoteToken,
+                        acceptPremium:
+                          result.isPremium &&
+                          premiumAccepted[result.domainName],
                       });
                       toast.success('Domínio adicionado ao carrinho');
                     } catch (e) {

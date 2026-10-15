@@ -7,10 +7,16 @@ import type {
   Page,
   AuditEntry,
 } from '@devtrust/contracts';
+import {
+  validationIssueSchema,
+  type ValidationIssue,
+} from '@devtrust/contracts';
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly fields: Record<string, string[]> = {},
+    readonly issues: ValidationIssue[] = [],
   ) {
     super(message);
   }
@@ -63,11 +69,24 @@ export async function request<T>(
     typeof window !== 'undefined'
   )
     window.dispatchEvent(new Event('devtrust:unauthorized'));
-  if (!response.ok)
+  if (!response.ok) {
+    const fields: Record<string, string[]> = {};
+    if (body.error?.fields && typeof body.error.fields === 'object') {
+      for (const [key, value] of Object.entries(body.error.fields))
+        if (
+          Array.isArray(value) &&
+          value.every((message) => typeof message === 'string')
+        )
+          fields[key] = value;
+    }
+    const issues = validationIssueSchema.array().safeParse(body.error?.issues);
     throw new ApiError(
       body.error?.message || 'Não foi possível concluir o pedido',
       response.status,
+      fields,
+      issues.success ? issues.data : [],
     );
+  }
   return body as T;
 }
 export const mutate = <T>(path: string, data: unknown = {}, method = 'POST') =>

@@ -430,6 +430,29 @@ export function PricingAdmin() {
       clearTimeout(timer);
     };
   }, [search]);
+  const editPrice = (p: PriceView) => {
+    priceForm.reset({
+      tldId: p.tldId,
+      registrarId: p.registrarId,
+      periodYears: p.periodYears,
+      operation: p.operation,
+      costSource: p.costSource,
+      supplierCurrency: p.supplierCurrency as 'CVE' | 'EUR' | 'USD',
+      currency: 'CVE',
+      supplierCostMinor: p.supplierCostMinor,
+      marginType: p.marginType as 'MARKUP' | 'FIXED' | 'GROSS_MARGIN',
+      marginValue: p.marginValue,
+      minimumPriceMinor: p.minimumPriceMinor,
+      additionalCostMinor: p.additionalCostMinor,
+      roundingIncrementMinor: p.roundingIncrementMinor,
+      manualSellingPriceMinor: p.manualSellingPriceMinor,
+      changeReason: p.changeReason ?? undefined,
+      effectiveUntil: p.effectiveUntil,
+    });
+    document
+      .getElementById('publish-price')
+      ?.scrollIntoView({ behavior: 'smooth' });
+  };
   const priceFields = [
     ['supplierCostMinor', 'Custo fornecedor (cêntimos)'],
     ['marginValue', 'Margem (valor fixo na moeda de venda ou %)'],
@@ -448,6 +471,16 @@ export function PricingAdmin() {
         <p role="alert" className="message error">
           {error}
         </p>
+      )}
+      {data?.total === 0 && (
+        <Card>
+          <p>
+            Ainda não existem políticas de preços. Consulte o custo
+            Openprovider, configure uma taxa de câmbio válida para CVE e
+            publique a margem de cada TLD e período. A pesquisa mantém o preço
+            indisponível até existir uma política válida.
+          </p>
+        </Card>
       )}
       <div className="commerce-filter">
         <Select
@@ -474,7 +507,7 @@ export function PricingAdmin() {
             <thead>
               <tr>
                 <th>Extensão</th>
-                <th>Período</th>
+                <th>Operação / Período</th>
                 <th>Custo</th>
                 <th>Venda</th>
                 <th>Estado</th>
@@ -485,24 +518,75 @@ export function PricingAdmin() {
               {data.items.map((p) => (
                 <tr key={p.id}>
                   <td>.{p.tld.extension}</td>
-                  <td>{p.periodYears} ano(s)</td>
+                  <td>
+                    {p.operation} · {p.periodYears} ano(s)
+                  </td>
                   <td>
                     {formatMoney(p.supplierCostMinor, p.supplierCurrency)}
                   </td>
                   <td>{formatMoney(p.sellingPriceMinor, p.currency)}</td>
                   <td>
-                    <Badge variant={p.isStale ? 'warning' : 'success'}>
-                      {p.isStale ? 'Expirado' : 'Válido'}
+                    <Badge
+                      variant={!p.isActive || p.isStale ? 'warning' : 'success'}
+                    >
+                      {!p.isActive
+                        ? 'Inativo'
+                        : p.isStale
+                          ? 'Expirado'
+                          : 'Válido'}
                     </Badge>
                   </td>
                   <td>
-                    <p>{new Date(p.updatedAt).toLocaleDateString('pt-PT')}</p>
+                    <p>
+                      Sincronização:{' '}
+                      {p.lastSyncedAt
+                        ? new Date(p.lastSyncedAt).toLocaleString('pt-PT')
+                        : 'Nunca'}
+                    </p>
+                    <p>
+                      Origem:{' '}
+                      {p.costSource === 'API' ? 'Openprovider' : 'Manual'}
+                    </p>
+                    {p.lastSyncAttemptAt && (
+                      <small>
+                        Tentativa:{' '}
+                        {new Date(p.lastSyncAttemptAt).toLocaleString('pt-PT')}
+                      </small>
+                    )}
+                    {p.lastSyncErrorCode && (
+                      <p role="status">{p.lastSyncErrorCode}</p>
+                    )}
+                    <Button variant="secondary" onClick={() => editPrice(p)}>
+                      Editar versão
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={async () => {
+                        try {
+                          await mutate(
+                            '/admin/pricing/' + p.id + '/state',
+                            { isActive: !p.isActive },
+                            'PATCH',
+                          );
+                          setRevision((v) => v + 1);
+                        } catch (e) {
+                          setError((e as Error).message);
+                        }
+                      }}
+                    >
+                      {p.isActive ? 'Desativar' : 'Ativar'}
+                    </Button>
                     <ConfirmDialog
                       title="Sincronizar custo?"
                       description="Será criada uma versão de preço com o custo recebido da Openprovider."
                       onConfirm={async () => {
-                        await mutate('/admin/pricing/' + p.id + '/sync');
-                        setRevision((v) => v + 1);
+                        try {
+                          await mutate('/admin/pricing/' + p.id + '/sync');
+                        } catch (e) {
+                          setError((e as Error).message);
+                        } finally {
+                          setRevision((v) => v + 1);
+                        }
                       }}
                     >
                       Sincronizar
@@ -521,7 +605,7 @@ export function PricingAdmin() {
         </Card>
       )}
       <Card className="section-gap">
-        <h2>Publicar versão de preço</h2>
+        <h2 id="publish-price">Publicar versão de preço</h2>
         <p>
           Valores monetários mínimos: 100 = 1,00. O preço configurado é o total
           do período, sem multiplicação implícita por anos.
@@ -586,6 +670,52 @@ export function PricingAdmin() {
               {...priceForm.register('periodYears', { valueAsNumber: true })}
             />
           </FormField>
+          <FormField id="operation-price" label="Operação">
+            <Select id="operation-price" {...priceForm.register('operation')}>
+              <option value="REGISTER">Registo</option>
+              <option value="RENEW">Renovação</option>
+              <option value="TRANSFER">Transferência</option>
+            </Select>
+          </FormField>
+          <FormField id="cost-source" label="Origem do custo">
+            <Select id="cost-source" {...priceForm.register('costSource')}>
+              <option value="MANUAL">Custo manual verificado</option>
+              <option value="API">Openprovider (consultado ao publicar)</option>
+            </Select>
+          </FormField>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={async () => {
+              setError('');
+              try {
+                const values = priceForm.getValues();
+                const cost = await mutate<{
+                  supplierCostMinor: string;
+                  supplierCurrency: 'CVE' | 'EUR' | 'USD';
+                }>('/admin/pricing/supplier-cost', {
+                  tldId: values.tldId,
+                  registrarId: values.registrarId,
+                  periodYears: values.periodYears,
+                  operation: values.operation ?? 'REGISTER',
+                });
+                priceForm.setValue(
+                  'supplierCostMinor',
+                  cost.supplierCostMinor,
+                  { shouldValidate: true },
+                );
+                priceForm.setValue('supplierCurrency', cost.supplierCurrency);
+                priceForm.setValue('costSource', 'API');
+                toast.success(
+                  'Custo real consultado. Configure a margem e o câmbio antes de publicar.',
+                );
+              } catch (e) {
+                setError((e as Error).message);
+              }
+            }}
+          >
+            Consultar custo Openprovider
+          </Button>
           {(['supplierCurrency', 'currency'] as const).map((name) => (
             <FormField
               key={name}
@@ -595,9 +725,11 @@ export function PricingAdmin() {
               }
             >
               <Select id={name} {...priceForm.register(name)}>
-                {['CVE', 'EUR', 'USD'].map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
+                {(name === 'currency' ? ['CVE'] : ['CVE', 'EUR', 'USD']).map(
+                  (c) => (
+                    <option key={c}>{c}</option>
+                  ),
+                )}
               </Select>
             </FormField>
           ))}
@@ -626,6 +758,30 @@ export function PricingAdmin() {
               />
             </FormField>
           ))}
+          <FormField
+            id="manual-selling-price"
+            label="Venda manual opcional (cêntimos, apenas standard)"
+            error={priceForm.formState.errors.manualSellingPriceMinor?.message}
+          >
+            <Input
+              id="manual-selling-price"
+              {...priceForm.register('manualSellingPriceMinor', {
+                setValueAs: (v) => (v === '' ? null : v),
+              })}
+            />
+          </FormField>
+          <FormField
+            id="price-reason"
+            label="Motivo da alteração (obrigatório para venda manual)"
+            error={priceForm.formState.errors.changeReason?.message}
+          >
+            <Input
+              id="price-reason"
+              {...priceForm.register('changeReason', {
+                setValueAs: (v) => (v === '' ? undefined : v),
+              })}
+            />
+          </FormField>
           <div className="form-actions">
             <Button disabled={priceForm.formState.isSubmitting}>
               Publicar preço

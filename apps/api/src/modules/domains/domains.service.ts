@@ -16,6 +16,7 @@ import { RuntimeService } from '../../common/runtime.service';
 import { digest } from '../../common/crypto';
 import { RegistrarRegistry } from '../registrars/registrar-registry.service';
 import { RegistrarError } from '../registrars/domain/registrar.types';
+import { PricingError } from '../pricing/pricing-error';
 import { PricingService } from '../pricing/pricing.service';
 import { AvailabilityCache } from './availability-cache.service';
 import { parseDomains } from './domain-name';
@@ -171,12 +172,23 @@ export class DomainsService {
               link.registrarId,
               input.registrationYears,
               price.cost,
+              result.isPremium,
             );
-            result.quote = commercial.quote;
+            result.quote = {
+              ...commercial.quote,
+              quoteToken: this.pricing.signQuote(
+                p.domainName,
+                registrarCode,
+                result.isPremium,
+                commercial.quote,
+              ),
+            };
             snapshot = commercial.snapshot;
           } catch (e) {
             result.errorCode =
-              e instanceof RegistrarError ? e.code : 'PRICE_UNAVAILABLE';
+              e instanceof RegistrarError || e instanceof PricingError
+                ? e.code
+                : 'PRICE_UNAVAILABLE';
           }
         if (result.status === 'UNKNOWN' && !result.errorCode)
           result.errorCode = 'PROVIDER_UNKNOWN_STATUS';

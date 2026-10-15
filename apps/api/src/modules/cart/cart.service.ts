@@ -13,6 +13,7 @@ import { DatabaseService } from '../../common/database.service';
 import { RuntimeService } from '../../common/runtime.service';
 import { AuthRequest } from '../../common/security';
 import { digest, equalHash, randomToken } from '../../common/crypto';
+import { PricingService } from '../pricing/pricing.service';
 import { DomainsService } from '../domains/domains.service';
 export const cartCookie = (production: boolean) =>
   production ? '__Host-dt_cart' : 'dt_cart';
@@ -22,6 +23,7 @@ export class CartService {
     @Inject(DatabaseService) private db: DatabaseService,
     @Inject(RuntimeService) private runtime: RuntimeService,
     @Inject(DomainsService) private domains: DomainsService,
+    @Inject(PricingService) private pricing: PricingService,
   ) {}
   private options() {
     return {
@@ -66,6 +68,10 @@ export class CartService {
           data: { status: 'OPEN', expiresAt: this.expires },
         });
       }
+      if (guest.items.some((i) => i.currency !== target.currency))
+        throw new ConflictException(
+          'Moedas incompatíveis. Revalide o carrinho antes de associar a conta.',
+        );
       for (const item of guest.items) {
         const data = {
           domainName: item.domainName,
@@ -191,6 +197,10 @@ export class CartService {
         },
       },
     });
+    if (cart.items.some((i) => i.currency !== cart.currency))
+      throw new ConflictException(
+        'Moedas incompatíveis. Limpe o carrinho e obtenha novas cotações em CVE.',
+      );
     return {
       id: cart.id,
       currency: cart.currency,
@@ -199,7 +209,7 @@ export class CartService {
         .reduce((sum, item) => sum + item.unitPriceMinor, 0n)
         .toString(),
       requiresRevalidation: cart.items.some(
-        (i) => i.quoteExpiresAt <= new Date(),
+        (i) => i.quoteExpiresAt <= new Date() || i.currency !== cart.currency,
       ),
       items: cart.items.map((i) => {
         const link = i.tld.registrars.find(
@@ -224,6 +234,8 @@ export class CartService {
     domainName: string,
     registrationYears: number,
     itemId?: string,
+    quoteToken?: string,
+    acceptPremium = false,
   ) {
     const cart = await this.resolve(req, undefined, true);
     if (itemId) {
@@ -240,18 +252,62 @@ export class CartService {
       true,
     );
     const result = search.results[0],
-      snapshot = search.snapshots.get(result.domainName);
-    if (result.status !== 'AVAILABLE' || !result.quote || !snapshot)
+      snapshot = result && search.snapshots.get(result.domainName);
+    if (
+      !result ||
+      result.status !== 'AVAILABLE' ||
+      !result.quote ||
+      !snapshot ||
+      new Date(result.quote.expiresAt) <= new Date()
+    )
       throw new ConflictException(
         'Disponibilidade ou cotação não confirmada. Pesquise novamente.',
       );
-    // Premium prices use the domain-specific quote. No purchase endpoint exists.
+    if (result.quote.currency !== cart.currency)
+      throw new ConflictException(
+        'Moeda do carrinho incompatível. Pesquise novamente em CVE.',
+      );
+    if (result.isPremium && (!quoteToken || !acceptPremium))
+      throw new ConflictException(
+        'Confirme explicitamente o valor premium da cotação.',
+      );
+    if (quoteToken)
+      this.pricing.verifyQuote(
+        quoteToken,
+        result.domainName,
+        result.registrarCode,
+        result.isPremium,
+        result.quote,
+      );
+    if (itemId && !quoteToken) {
+      const previous = await this.db.cartItem.findFirst({
+        where: { id: itemId, cartId: cart.id },
+      });
+      if (
+        previous &&
+        (previous.registrationYears !== registrationYears ||
+          previous.unitPriceMinor.toString() !== result.quote.priceMinor ||
+          previous.currency !== result.quote.currency)
+      )
+        throw new ConflictException(
+          'Preço ou período alterado. Pesquise e confirme a nova cotação.',
+        );
+    }
+    snapshot.premiumAccepted = result.isPremium && acceptPremium;
+    snapshot.premiumAcceptedAt = result.isPremium
+      ? new Date().toISOString()
+      : null;
 
     await this.db.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${cart.id},0))`;
       const current = await tx.cart.findUniqueOrThrow({
         where: { id: cart.id },
       });
+      if (
+        current.currency !== result.quote!.currency ||
+        new Date(result.quote!.expiresAt) <= new Date()
+      )
+        throw new ConflictException('Cotação expirada ou moeda alterada');
       if (current.status !== 'OPEN' || current.expiresAt <= new Date())
         throw new ConflictException('Carrinho expirado');
       const count = await tx.cartItem.count({ where: { cartId: cart.id } }),

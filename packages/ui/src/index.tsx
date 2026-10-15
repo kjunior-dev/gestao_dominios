@@ -161,7 +161,7 @@ export function FormField({
       <label htmlFor={id}>{label}</label>
       {children}
       {error && (
-        <p role="alert" className="field-error">
+        <p id={id + '-error'} role="alert" className="field-error">
           {error}
         </p>
       )}

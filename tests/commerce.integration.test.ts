@@ -597,10 +597,15 @@ describe('Persistent guest/customer carts and server-only quotes', () => {
     expect(JSON.stringify(first.body)).not.toContain('supplierCost');
   });
   it('updates period by rechecking provider and recalculates total', async () => {
+    const quote = await mutation(guest, '/domains/check', {
+      query: 'cart.com',
+      registrationYears: 2,
+    });
+    vi.mocked(provider.checkAvailability).mockClear();
     const res = await mutation(
       guest,
       '/cart/items/' + itemId,
-      { registrationYears: 2 },
+      { registrationYears: 2, quoteToken: quote.body[0].quote.quoteToken },
       'patch',
       guestCsrf,
       true,
@@ -636,10 +641,17 @@ describe('Persistent guest/customer carts and server-only quotes', () => {
     ).toBe(409);
   });
   it('quotes premium independently without registering or buying it', async () => {
+    const quote = await mutation(guest, '/domains/check', {
+      query: 'premium.com',
+    });
     const res = await mutation(
       guest,
       '/cart/items',
-      { domainName: 'premium.com' },
+      {
+        domainName: 'premium.com',
+        quoteToken: quote.body[0].quote.quoteToken,
+        acceptPremium: true,
+      },
       'post',
       guestCsrf,
       true,
@@ -746,5 +758,285 @@ describe('Persistent guest/customer carts and server-only quotes', () => {
       ).status,
     ).toBe(410);
     expect((await customer.get('/api/v1/cart')).body.items).toHaveLength(0);
+  });
+});
+
+describe('Pricing administration and quote acceptance', () => {
+  let pricingTldId: string, publishedId: string;
+  const input = () => ({
+    tldId: pricingTldId,
+    registrarId,
+    periodYears: 1,
+    supplierCurrency: 'CVE',
+    currency: 'CVE',
+    supplierCostMinor: '1',
+    costSource: 'API',
+    marginType: 'MARKUP',
+    marginValue: '20',
+    effectiveUntil: new Date(Date.now() + 3600000).toISOString(),
+  });
+  it('preserves availability and identifies missing commercial configuration', async () => {
+    const tld = await db.tld.create({
+      data: {
+        extension: 'pricingtest',
+        displayName: 'Pricing test',
+        isActive: true,
+        registrars: {
+          create: {
+            registrarId,
+            isActive: true,
+            supportsRegistration: true,
+            maximumPeriod: 3,
+          },
+        },
+      },
+    });
+    pricingTldId = tld.id;
+    const res = await mutation(agent(), '/domains/check', {
+      query: 'normal.pricingtest',
+    });
+    expect(res.body[0]).toMatchObject({
+      status: 'AVAILABLE',
+      quote: null,
+      errorCode: 'PRICE_POLICY_UNAVAILABLE',
+    });
+  });
+  it('retrieves initial cost and replaces a client supplied API cost before publication', async () => {
+    const cost = await mutation(
+      admin,
+      '/admin/pricing/supplier-cost',
+      { tldId: pricingTldId, registrarId, periodYears: 1 },
+      'post',
+      adminCsrf,
+    );
+    expect(cost.status).toBe(201);
+    expect(cost.body.supplierCostMinor).toBe('1000');
+    const res = await mutation(
+      admin,
+      '/admin/pricing',
+      input(),
+      'post',
+      adminCsrf,
+    );
+    expect(res.status).toBe(201);
+    publishedId = res.body.id;
+    expect(res.body).toMatchObject({
+      costSource: 'API',
+      supplierCostMinor: '1000',
+      sellingPriceMinor: '1200',
+      lastSyncErrorCode: null,
+    });
+    expect(res.body.lastSyncedAt).toBeTruthy();
+    const search = await mutation(agent(), '/domains/check', {
+      query: 'normal.pricingtest',
+    });
+    expect(search.body[0].quote).toMatchObject({
+      priceMinor: '1200',
+      currency: 'CVE',
+      periodYears: 1,
+    });
+    expect(search.body[0].quote.quoteToken).toBeTruthy();
+    expect(JSON.stringify(search.body)).not.toContain('supplierCost');
+  });
+  it('disables prices without losing their administrative visibility and reactivates them', async () => {
+    expect(
+      (
+        await mutation(
+          admin,
+          '/admin/pricing/' + publishedId + '/state',
+          { isActive: false },
+          'patch',
+          adminCsrf,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await mutation(agent(), '/domains/check', {
+          query: 'normal.pricingtest',
+        })
+      ).body[0].quote,
+    ).toBeNull();
+    const list = await admin.get('/api/v1/admin/pricing');
+    expect(
+      list.body.items.some(
+        (p: { id: string; isActive: boolean }) =>
+          p.id === publishedId && !p.isActive,
+      ),
+    ).toBe(true);
+    expect(
+      (
+        await mutation(
+          admin,
+          '/admin/pricing/' + publishedId + '/state',
+          { isActive: true },
+          'patch',
+          adminCsrf,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      await db.auditLog.count({
+        where: { resourceId: publishedId, action: 'pricing.state_changed' },
+      }),
+    ).toBe(2);
+  });
+  it('records failed synchronization and preserves the published cost', async () => {
+    vi.mocked(provider.getTldPricing).mockRejectedValueOnce(
+      new RegistrarError('PROVIDER_PERMISSION_DENIED'),
+    );
+    expect(
+      (
+        await mutation(
+          admin,
+          '/admin/pricing/' + publishedId + '/sync',
+          {},
+          'post',
+          adminCsrf,
+        )
+      ).status,
+    ).toBe(422);
+    const price = await db.tldPrice.findUniqueOrThrow({
+      where: { id: publishedId },
+    });
+    expect(price.lastSyncErrorCode).toBe('PROVIDER_PERMISSION_DENIED');
+    expect(price.lastSyncAttemptAt).not.toBeNull();
+    expect(price.supplierCostMinor).toBe(1000n);
+    expect(price.isActive).toBe(true);
+  });
+  it('keeps operation policies independent and audits a manual sale', async () => {
+    const manual = await mutation(
+      admin,
+      '/admin/pricing',
+      {
+        ...input(),
+        costSource: 'MANUAL',
+        supplierCostMinor: '1000',
+        manualSellingPriceMinor: '7777',
+        changeReason: 'Campanha autorizada',
+      },
+      'post',
+      adminCsrf,
+    );
+    expect(manual.status).toBe(201);
+    const renewal = await mutation(
+      admin,
+      '/admin/pricing',
+      { ...input(), operation: 'RENEW' },
+      'post',
+      adminCsrf,
+    );
+    expect(renewal.status).toBe(201);
+    const normal = await mutation(agent(), '/domains/check', {
+      query: 'normal.pricingtest',
+    });
+    expect(normal.body[0].quote.priceMinor).toBe('7777');
+    const premium = await mutation(agent(), '/domains/check', {
+      query: 'premium.pricingtest',
+    });
+    expect(premium.body[0].quote.priceMinor).toBe('120000');
+  });
+  it('requires premium acceptance of the exact valid quote and rejects changed or forged quotes', async () => {
+    await customer.get('/api/v1/cart');
+    const domainName = 'premium.pricingtest';
+    const quote = (
+      await mutation(customer, '/domains/check', { query: domainName })
+    ).body[0].quote;
+    expect(
+      (
+        await mutation(
+          customer,
+          '/cart/items',
+          { domainName },
+          'post',
+          customerCsrf,
+        )
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await mutation(
+          customer,
+          '/cart/items',
+          { domainName, quoteToken: quote.quoteToken },
+          'post',
+          customerCsrf,
+        )
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await mutation(
+          customer,
+          '/cart/items',
+          {
+            domainName,
+            acceptPremium: true,
+            quoteToken: quote.quoteToken + 'x',
+          },
+          'post',
+          customerCsrf,
+        )
+      ).status,
+    ).toBe(409);
+    const added = await mutation(
+      customer,
+      '/cart/items',
+      { domainName, acceptPremium: true, quoteToken: quote.quoteToken },
+      'post',
+      customerCsrf,
+    );
+    expect(added.status).toBe(201);
+    const cart = await db.cart.findUniqueOrThrow({
+      where: { userId: customerId },
+      include: { items: true },
+    });
+    expect(cart.items[0].priceSnapshot).toMatchObject({
+      premiumAccepted: true,
+    });
+    const changed = await mutation(
+      customer,
+      '/cart/items',
+      { domainName: 'normal.pricingtest', quoteToken: quote.quoteToken },
+      'post',
+      customerCsrf,
+    );
+    expect(changed.status).toBe(409);
+  });
+  it('preserves confirmed availability on pricing API failure', async () => {
+    vi.mocked(provider.getTldPricing).mockRejectedValueOnce(
+      new RegistrarError('PROVIDER_INVALID_RESPONSE'),
+    );
+    const res = await mutation(agent(), '/domains/check', {
+      query: 'failure.pricingtest',
+    });
+    expect(res.body[0]).toMatchObject({
+      status: 'AVAILABLE',
+      quote: null,
+      errorCode: 'PROVIDER_INVALID_RESPONSE',
+    });
+  });
+  it('synchronizes inactive versions without reactivating them or replacing the current policy', async () => {
+    const active = await db.tldPrice.findFirstOrThrow({
+      where: { tldId: pricingTldId, operation: 'REGISTER', isActive: true },
+    });
+    const synced = await mutation(
+      admin,
+      '/admin/pricing/' + publishedId + '/sync',
+      {},
+      'post',
+      adminCsrf,
+    );
+    expect(synced.status).toBe(201);
+    expect(synced.body.isActive).toBe(false);
+    expect(synced.body.lastSyncedAt).toBeTruthy();
+    expect(
+      (await db.tldPrice.findUniqueOrThrow({ where: { id: active.id } }))
+        .isActive,
+    ).toBe(true);
+    expect(
+      (await db.tldPrice.findUniqueOrThrow({ where: { id: publishedId } }))
+        .lastSyncErrorCode,
+    ).toBeNull();
   });
 });

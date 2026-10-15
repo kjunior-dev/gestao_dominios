@@ -75,6 +75,13 @@ export class CheckoutService {
       !cart.items.length
     )
       throw new ConflictException('Carrinho vazio ou expirado');
+    if (
+      cart.currency !== 'CVE' ||
+      cart.items.some((i) => i.currency !== cart.currency)
+    )
+      throw new ConflictException(
+        'Moeda do carrinho incompatível. Atualize as cotações.',
+      );
     if (cart.items.some((i) => i.quoteExpiresAt <= new Date()))
       throw new ConflictException(
         'Cotação expirada. Atualize os itens do carrinho.',
@@ -104,7 +111,14 @@ export class CheckoutService {
         throw new ConflictException(
           'Preço alterado. Atualize o carrinho e confirme novamente.',
         );
-      if (result.isPremium && !body.acceptPremium)
+      if (new Date(result.quote.expiresAt) <= new Date())
+        throw new ConflictException('Cotação expirada');
+      if (
+        result.isPremium &&
+        (!body.acceptPremium ||
+          (item.priceSnapshot as Record<string, unknown>).premiumAccepted !==
+            true)
+      )
         throw new ConflictException('Confirme explicitamente as taxas premium');
       snapshots.set(item.id, snap);
     }
@@ -148,6 +162,13 @@ export class CheckoutService {
         }))
       )
         throw new ConflictException('Contacto inválido');
+      if (
+        current.items.some((i) => i.quoteExpiresAt <= new Date()) ||
+        [...snapshots.values()].some(
+          (s) => new Date(String(s.expiresAt)) <= new Date(),
+        )
+      )
+        throw new ConflictException('Cotação expirada durante a confirmação');
       const subtotal = cart.items.reduce((n, i) => n + i.unitPriceMinor, 0n),
         tax =
           (subtotal * BigInt(this.runtime.env.BILLING_TAX_BASIS_POINTS) +

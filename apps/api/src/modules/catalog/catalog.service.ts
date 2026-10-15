@@ -11,6 +11,7 @@ import {
   tldSchema,
   priceSchema,
   exchangeRateSchema,
+  supplierPriceRequestSchema,
 } from '@devtrust/contracts';
 import { DatabaseService } from '../../common/database.service';
 import { RuntimeService } from '../../common/runtime.service';
@@ -121,7 +122,64 @@ export class CatalogService {
       return tld;
     });
   }
-  async savePrice(input: z.infer<typeof priceSchema>, actor: string) {
+  async supplierCost(input: z.infer<typeof supplierPriceRequestSchema>) {
+    const link = await this.db.tldRegistrar.findUnique({
+      where: {
+        tldId_registrarId: {
+          tldId: input.tldId,
+          registrarId: input.registrarId,
+        },
+      },
+      include: { tld: true, registrar: true },
+    });
+    if (
+      !link ||
+      input.periodYears < link.minimumPeriod ||
+      input.periodYears > link.maximumPeriod
+    )
+      throw new BadRequestException('Período ou fornecedor inválido');
+    try {
+      const supplier = await this.registry
+        .get(link.registrar.code)
+        .getTldPricing({
+          extension: link.tld.extension,
+          periodYears: input.periodYears,
+          operation: input.operation,
+        });
+      if (supplier.isPremium)
+        throw new RegistrarError('INVALID_STANDARD_PRICE');
+      return {
+        supplierCostMinor: supplier.cost.minor,
+        supplierCurrency: supplier.cost.currency,
+        fetchedAt: new Date().toISOString(),
+      };
+    } catch (e) {
+      const code = e instanceof RegistrarError ? e.code : 'PRICE_SYNC_FAILED';
+      throw new UnprocessableEntityException({
+        code,
+        message:
+          'Custo indisponível: ' +
+          code +
+          '. Para períodos sem preço standard, configure um custo manual verificado.',
+      });
+    }
+  }
+  async savePrice(
+    input: z.infer<typeof priceSchema>,
+    actor: string,
+    isActive = true,
+    syncSourceId?: string,
+  ) {
+    let syncedAt: Date | null = null;
+    if (input.costSource === 'API') {
+      const supplier = await this.supplierCost(input);
+      input = {
+        ...input,
+        supplierCostMinor: supplier.supplierCostMinor,
+        supplierCurrency: supplier.supplierCurrency,
+      };
+      syncedAt = new Date(supplier.fetchedAt);
+    }
     const link = await this.db.tldRegistrar.findUnique({
       where: {
         tldId_registrarId: {
@@ -144,6 +202,12 @@ export class CatalogService {
     );
     const data = {
       ...input,
+      manualSellingPriceMinor:
+        input.manualSellingPriceMinor == null
+          ? null
+          : BigInt(input.manualSellingPriceMinor),
+      lastSyncAttemptAt: syncedAt,
+      lastSyncedAt: syncedAt,
       marginValue: new Prisma.Decimal(input.marginValue),
       supplierCostMinor: BigInt(input.supplierCostMinor),
       minimumPriceMinor: BigInt(input.minimumPriceMinor),
@@ -152,26 +216,39 @@ export class CatalogService {
       effectiveUntil: new Date(input.effectiveUntil),
     };
     const sellingPriceMinor = BigInt(
-      calculatePrice(input.supplierCostMinor, rate.rate, data),
+      input.manualSellingPriceMinor ??
+        calculatePrice(input.supplierCostMinor, rate.rate, data),
     );
     return exactView(
       await this.db.$transaction(async (tx) => {
         const scope =
-          input.tldId + input.registrarId + input.periodYears + input.currency;
+          input.tldId +
+          input.registrarId +
+          input.operation +
+          input.periodYears +
+          input.currency;
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope},0))`;
-        await tx.tldPrice.updateMany({
-          where: {
-            tldId: input.tldId,
-            registrarId: input.registrarId,
-            periodYears: input.periodYears,
-            currency: input.currency,
-            operation: 'REGISTER',
-            isActive: true,
-          },
-          data: { isActive: false },
-        });
+        const publishActive = syncSourceId
+          ? (
+              await tx.tldPrice.findUniqueOrThrow({
+                where: { id: syncSourceId },
+              })
+            ).isActive
+          : isActive;
+        if (publishActive)
+          await tx.tldPrice.updateMany({
+            where: {
+              tldId: input.tldId,
+              registrarId: input.registrarId,
+              periodYears: input.periodYears,
+              currency: input.currency,
+              operation: input.operation,
+              isActive: true,
+            },
+            data: { isActive: false },
+          });
         const price = await tx.tldPrice.create({
-          data: { ...data, sellingPriceMinor },
+          data: { ...data, sellingPriceMinor, isActive: publishActive },
         });
         await this.audit.record(
           'pricing.version_created',
@@ -184,6 +261,10 @@ export class CatalogService {
             currency: input.currency,
             marginType: input.marginType,
             marginValue: input.marginValue,
+            costSource: input.costSource,
+            changeReason: input.changeReason ?? null,
+            manualSellingPriceMinor: input.manualSellingPriceMinor ?? null,
+            operation: input.operation,
           },
           tx,
         );
@@ -192,7 +273,7 @@ export class CatalogService {
     );
   }
   async prices(page: number, pageSize: number, registrarId?: string) {
-    const where = { isActive: true, ...(registrarId ? { registrarId } : {}) };
+    const where = { ...(registrarId ? { registrarId } : {}) };
     const [items, total] = await Promise.all([
       this.db.tldPrice.findMany({
         where,
@@ -335,41 +416,101 @@ export class CatalogService {
       );
     }
   }
-  async syncPrice(priceId: string, actor: string) {
-    const price = await this.db.tldPrice.findUnique({
-      where: { id: priceId },
-      include: { tld: true, registrar: true },
-    });
-    if (!price) throw new NotFoundException('Preço não encontrado');
-    try {
-      const supplier = await this.registry
-        .get(price.registrar.code)
-        .getTldPricing({
-          extension: price.tld.extension,
-          periodYears: price.periodYears,
+  async setPriceState(id: string, isActive: boolean, actor: string) {
+    return exactView(
+      await this.db.$transaction(async (tx) => {
+        const price = await tx.tldPrice.findUnique({ where: { id } });
+        if (!price) throw new NotFoundException('Preço não encontrado');
+        const scope =
+          price.tldId +
+          price.registrarId +
+          price.operation +
+          price.periodYears +
+          price.currency;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope},0))`;
+        if (isActive && price.effectiveUntil <= new Date())
+          throw new BadRequestException('Renove a validade antes de ativar');
+        if (isActive) {
+          await this.pricing.rate(price.supplierCurrency, price.currency);
+          await tx.tldPrice.updateMany({
+            where: {
+              tldId: price.tldId,
+              registrarId: price.registrarId,
+              operation: price.operation,
+              periodYears: price.periodYears,
+              currency: price.currency,
+              isActive: true,
+            },
+            data: { isActive: false },
+          });
+        }
+        const updated = await tx.tldPrice.update({
+          where: { id },
+          data: { isActive },
         });
-      return this.savePrice(
+        await this.audit.record(
+          'pricing.state_changed',
+          'TldPrice',
+          actor,
+          id,
+          undefined,
+          { isActive },
+          tx,
+        );
+        return updated;
+      }),
+    );
+  }
+  async syncPrice(priceId: string, actor: string) {
+    const price = await this.db.tldPrice.findUnique({ where: { id: priceId } });
+    if (!price) throw new NotFoundException('Preço não encontrado');
+    await this.db.tldPrice.update({
+      where: { id: priceId },
+      data: { lastSyncAttemptAt: new Date() },
+    });
+    try {
+      const result = await this.savePrice(
         {
           tldId: price.tldId,
           registrarId: price.registrarId,
           periodYears: price.periodYears,
-          supplierCurrency: supplier.cost.currency,
-          currency: price.currency as 'CVE' | 'EUR' | 'USD',
-          supplierCostMinor: supplier.cost.minor,
+          operation: price.operation,
+          costSource: 'API',
+          currency: 'CVE',
+          supplierCurrency: price.supplierCurrency as 'CVE' | 'EUR' | 'USD',
+          supplierCostMinor: price.supplierCostMinor.toString(),
           marginType: price.marginType,
           marginValue: price.marginValue.toString(),
           minimumPriceMinor: price.minimumPriceMinor.toString(),
           additionalCostMinor: price.additionalCostMinor.toString(),
           roundingIncrementMinor: price.roundingIncrementMinor.toString(),
+          manualSellingPriceMinor:
+            price.manualSellingPriceMinor?.toString() ?? null,
+          changeReason: price.changeReason ?? undefined,
           effectiveUntil: price.effectiveUntil.toISOString(),
         },
         actor,
+        price.isActive,
+        priceId,
       );
+      await this.db.tldPrice.update({
+        where: { id: priceId },
+        data: { lastSyncedAt: new Date(), lastSyncErrorCode: null },
+      });
+      return result;
     } catch (e) {
-      if (e instanceof RegistrarError)
-        throw new UnprocessableEntityException(
-          'Sincronização indisponível: ' + e.code,
-        );
+      const response =
+        e instanceof UnprocessableEntityException ? e.getResponse() : null;
+      const code =
+        e instanceof RegistrarError
+          ? e.code
+          : response && typeof response === 'object' && 'code' in response
+            ? String(response.code)
+            : 'PRICE_SYNC_FAILED';
+      await this.db.tldPrice.update({
+        where: { id: priceId },
+        data: { lastSyncErrorCode: code },
+      });
       throw e;
     }
   }

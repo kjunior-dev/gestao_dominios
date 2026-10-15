@@ -197,6 +197,8 @@ beforeEach(async () => {
     await runtime.redis.del(key);
   for (const key of await runtime.redis.keys('domain:rate:*'))
     await runtime.redis.del(key);
+  for (const key of await runtime.redis.keys('domains:raw:*'))
+    await runtime.redis.del(key);
   const config = {
     ...runtime.env,
     MOCK_WEBHOOK_SECRET:
@@ -233,11 +235,16 @@ const checkoutBody = () => ({
   idempotencyKey: randomUUID(),
 });
 async function cart(name = 'contract') {
+  const quote = await req('post', '/domains/check', customerCookie, {
+    query: name + '.phase3test',
+  });
   expect(
     (
       await req('post', '/cart/items', customerCookie, {
         domainName: name + '.phase3test',
         registrationYears: 1,
+        quoteToken: quote.body[0].quote.quoteToken,
+        acceptPremium: premium,
       })
     ).status,
   ).toBe(201);
@@ -1052,5 +1059,32 @@ describe('Environment separation', () => {
         .lastErrorCode,
     ).toBe('REGISTRAR_ENVIRONMENT_MISMATCH');
     expect(await db.managedDomain.count()).toBe(0);
+  });
+});
+
+describe('Checkout validation response contract', () => {
+  it('returns specific nested errors without creating an order', async () => {
+    const body = checkoutBody();
+    const response = await req('post', '/checkout', customerCookie, {
+      ...body,
+      nameservers: ['https://invalid.example.test', 'ns2.example.test'],
+      billing: { ...body.billing, postalCode: '' },
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatchObject({
+      message: 'Dados inválidos',
+      fields: { nameservers: expect.any(Array), billing: expect.any(Array) },
+      issues: expect.arrayContaining([
+        {
+          path: ['nameservers', 0],
+          message: expect.stringContaining('nome DNS válido'),
+        },
+        {
+          path: ['billing', 'postalCode'],
+          message: expect.stringContaining('pelo menos 1'),
+        },
+      ]),
+    });
+    expect(await db.order.count()).toBe(0);
   });
 });

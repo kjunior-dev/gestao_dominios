@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { RegistrarError } from '../../apps/api/src/modules/registrars/domain/registrar.types';
 import { createApp } from '../../apps/api/src/bootstrap';
 import { DatabaseService } from '../../apps/api/src/common/database.service';
 import { RegistrarRegistry } from '../../apps/api/src/modules/registrars/registrar-registry.service';
@@ -66,17 +67,21 @@ async function main() {
       return domains.map((d) => ({
         domainName: d.domainName,
         status: d.name === 'occupied' ? 'REGISTERED' : 'AVAILABLE',
-        isPremium: false,
+        isPremium: d.name === 'premium',
         checkedAt: new Date().toISOString(),
       }));
     },
-    async getTldPricing({ periodYears }) {
+    async getTldPricing({ periodYears, name }) {
+      if (name === 'noquote')
+        throw new RegistrarError('PROVIDER_INVALID_RESPONSE');
       return {
         cost: {
-          minor: (1000n * BigInt(periodYears)).toString(),
+          minor: (
+            (name === 'premium' ? 100000n : 1000n) * BigInt(periodYears)
+          ).toString(),
           currency: 'CVE',
         },
-        isPremium: false,
+        isPremium: name === 'premium',
       };
     },
     async getSupportedTlds() {

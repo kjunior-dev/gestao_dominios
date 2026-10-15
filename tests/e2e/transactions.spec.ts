@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { randomBytes } from 'node:crypto';
 test('checkout, mock payment, asynchronous registration and internal receipt', async ({
   page,

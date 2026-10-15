@@ -1,8 +1,6 @@
-import {
-  Inject,
-  Injectable,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { Prisma } from '@devtrust/database';
+import { PricingError } from './pricing-error';
 import { DatabaseService } from '../../common/database.service';
 import {
   ExchangeRateProvider,
@@ -22,10 +20,17 @@ export class ManualExchangeRateProvider implements ExchangeRateProvider {
       where: { baseCurrency, targetCurrency, expiresAt: { gt: new Date() } },
       orderBy: { fetchedAt: 'desc' },
     });
-    if (!rate)
-      throw new UnprocessableEntityException(
-        'Taxa de câmbio válida indisponível',
+    if (!rate) {
+      const previous = await this.db.exchangeRate.findFirst({
+        where: { baseCurrency, targetCurrency },
+        orderBy: { fetchedAt: 'desc' },
+      });
+      throw new PricingError(
+        previous ? 'EXCHANGE_RATE_EXPIRED' : 'EXCHANGE_RATE_UNAVAILABLE',
       );
+    }
+    if (!new Prisma.Decimal(rate.rate).gt(0))
+      throw new PricingError('INVALID_EXCHANGE_RATE');
     return {
       rate: rate.rate.toString(),
       expiresAt: rate.expiresAt,

@@ -15,6 +15,7 @@ export type AvailabilityResult = {
   checkedAt: string;
 };
 export type PricingRequest = {
+  operation?: 'REGISTER' | 'RENEW' | 'TRANSFER';
   extension: string;
   name?: string;
   periodYears: number;

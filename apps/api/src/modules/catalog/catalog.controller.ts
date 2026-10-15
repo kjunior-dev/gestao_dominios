@@ -16,6 +16,8 @@ import {
   tldSchema,
   priceSchema,
   exchangeRateSchema,
+  supplierPriceRequestSchema,
+  priceStateSchema,
   paginationSchema,
 } from '@devtrust/contracts';
 import { RequirePermission, AuthRequest } from '../../common/security';
@@ -61,6 +63,24 @@ export class CatalogController {
     @Req() req: AuthRequest,
   ) {
     return this.catalog.savePrice(body, req.user.id);
+  }
+  @Post('pricing/supplier-cost')
+  @ApiInput(supplierPriceRequestSchema)
+  supplierCost(
+    @Body(new SchemaPipe(supplierPriceRequestSchema))
+    body: z.infer<typeof supplierPriceRequestSchema>,
+  ) {
+    return this.catalog.supplierCost(body);
+  }
+  @Patch('pricing/:id/state')
+  @ApiInput(priceStateSchema)
+  state(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body(new SchemaPipe(priceStateSchema))
+    body: z.infer<typeof priceStateSchema>,
+    @Req() req: AuthRequest,
+  ) {
+    return this.catalog.setPriceState(id, body.isActive, req.user.id);
   }
   @Post('pricing/:id/sync') syncPrice(
     @Param('id', new ParseUUIDPipe()) id: string,

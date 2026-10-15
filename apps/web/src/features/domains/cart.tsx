@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CartView } from '@devtrust/contracts';
+import { CartView, DomainResult } from '@devtrust/contracts';
 import {
   Button,
   Card,
@@ -11,13 +11,27 @@ import {
   LoadingState,
   EmptyState,
   ConfirmDialog,
+  Checkbox,
 } from '@devtrust/ui';
 import { mutate, request } from '@/lib/api';
 import { formatMoney } from './money';
 export function ShoppingCart() {
   const [cart, setCart] = useState<CartView | null>(null),
     [error, setError] = useState(''),
-    [busy, setBusy] = useState('');
+    [busy, setBusy] = useState(''),
+    [pending, setPending] = useState<{
+      id: string;
+      result: DomainResult;
+    } | null>(null),
+    [accepted, setAccepted] = useState(false),
+    [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const expired =
+    cart?.items.some((i) => new Date(i.quoteExpiresAt).getTime() <= now) ??
+    false;
   const load = () =>
     request<CartView>('/cart')
       .then(setCart)
@@ -39,13 +53,15 @@ export function ShoppingCart() {
     setBusy(id);
     setError('');
     try {
-      setCart(
-        await mutate<CartView>(
-          '/cart/items/' + id,
-          { registrationYears: years },
-          'PATCH',
-        ),
-      );
+      const results = await mutate<DomainResult[]>('/domains/check', {
+        query: cart!.items.find((i) => i.id === id)!.domainName,
+        registrationYears: years,
+      });
+      const result = results[0];
+      if (!result?.quote || result.status !== 'AVAILABLE')
+        throw new Error('Preço indisponível');
+      setAccepted(false);
+      setPending({ id, result });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -65,6 +81,61 @@ export function ShoppingCart() {
             Atualizar carrinho
           </Button>
         </div>
+      )}
+      {pending?.result.quote && (
+        <Card role="region" aria-label="Confirmar nova cotação">
+          <h2>Confirmar nova cotação de {pending.result.domainName}</h2>
+          <p>
+            {formatMoney(
+              pending.result.quote.priceMinor,
+              pending.result.quote.currency,
+            )}{' '}
+            por {pending.result.quote.periodYears} ano(s)
+          </p>
+          {pending.result.isPremium && (
+            <label>
+              <Checkbox
+                checked={accepted}
+                onChange={(e) => setAccepted(e.target.checked)}
+              />
+              Aceito explicitamente este valor premium
+            </label>
+          )}
+          <Button
+            disabled={
+              Boolean(busy) ||
+              new Date(pending.result.quote.expiresAt).getTime() <= now ||
+              (pending.result.isPremium && !accepted)
+            }
+            onClick={async () => {
+              setBusy(pending.id);
+              setError('');
+              try {
+                setCart(
+                  await mutate<CartView>(
+                    '/cart/items/' + pending.id,
+                    {
+                      registrationYears: pending.result.quote!.periodYears,
+                      quoteToken: pending.result.quote!.quoteToken,
+                      acceptPremium: pending.result.isPremium && accepted,
+                    },
+                    'PATCH',
+                  ),
+                );
+                setPending(null);
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy('');
+              }
+            }}
+          >
+            Confirmar cotação
+          </Button>
+          <Button variant="ghost" onClick={() => setPending(null)}>
+            Cancelar
+          </Button>
+        </Card>
       )}
       {!cart && !error ? (
         <LoadingState />
@@ -159,7 +230,7 @@ export function ShoppingCart() {
               <strong>
                 Subtotal: {formatMoney(cart.subtotalMinor, cart.currency)}
               </strong>
-              {cart.requiresRevalidation && (
+              {(cart.requiresRevalidation || expired) && (
                 <p role="status" className="error">
                   Existem cotações expiradas. Revalide os itens antes de avançar
                   no checkout.
@@ -169,7 +240,7 @@ export function ShoppingCart() {
                 Este carrinho não garante disponibilidade. Não foi efetuado
                 qualquer registo ou pagamento.
               </p>
-              <Button asChild disabled={cart.requiresRevalidation}>
+              <Button asChild disabled={cart.requiresRevalidation || expired}>
                 <Link href="/checkout">Continuar para checkout</Link>
               </Button>
               <ConfirmDialog

@@ -40,7 +40,14 @@ export class CartController {
     @Req() req: AuthRequest,
     @Body(new SchemaPipe(cartItemSchema)) body: z.infer<typeof cartItemSchema>,
   ) {
-    return this.cart.put(req, body.domainName, body.registrationYears);
+    return this.cart.put(
+      req,
+      body.domainName,
+      body.registrationYears,
+      undefined,
+      body.quoteToken,
+      body.acceptPremium,
+    );
   }
   @Patch('items/:id') @ApiInput(cartPeriodSchema) update(
     @Req() req: AuthRequest,
@@ -48,7 +55,14 @@ export class CartController {
     @Body(new SchemaPipe(cartPeriodSchema))
     body: z.infer<typeof cartPeriodSchema>,
   ) {
-    return this.cart.put(req, '', body.registrationYears, id);
+    return this.cart.put(
+      req,
+      '',
+      body.registrationYears,
+      id,
+      body.quoteToken,
+      body.acceptPremium,
+    );
   }
   @Delete('items/:id') remove(
     @Req() req: AuthRequest,

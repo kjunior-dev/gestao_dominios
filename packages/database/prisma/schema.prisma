@@ -267,26 +267,32 @@ model TldRegistrar {
 }
 
 model TldPrice {
-  id                     String              @id @default(uuid()) @db.Uuid
-  tldId                  String              @db.Uuid
-  registrarId            String              @db.Uuid
-  operation              DomainOperationKind @default(REGISTER)
-  periodYears            Int
-  supplierCurrency       String
-  currency               String              @default("CVE")
-  supplierCostMinor      BigInt
-  sellingPriceMinor      BigInt
-  marginType             MarginType
-  marginValue            Decimal             @db.Decimal(20, 8)
-  minimumPriceMinor      BigInt              @default(0)
-  additionalCostMinor    BigInt              @default(0)
-  roundingIncrementMinor BigInt              @default(1)
-  isActive               Boolean             @default(true)
-  effectiveFrom          DateTime            @default(now())
-  effectiveUntil         DateTime
-  updatedAt              DateTime            @updatedAt
-  tld                    Tld                 @relation(fields: [tldId], references: [id], onDelete: Restrict)
-  registrar              Registrar           @relation(fields: [registrarId], references: [id], onDelete: Restrict)
+  id                      String              @id @default(uuid()) @db.Uuid
+  tldId                   String              @db.Uuid
+  registrarId             String              @db.Uuid
+  operation               DomainOperationKind @default(REGISTER)
+  periodYears             Int
+  supplierCurrency        String
+  currency                String              @default("CVE")
+  supplierCostMinor       BigInt
+  sellingPriceMinor       BigInt
+  costSource              String              @default("MANUAL")
+  manualSellingPriceMinor BigInt?
+  changeReason            String?
+  lastSyncAttemptAt       DateTime?
+  lastSyncedAt            DateTime?
+  lastSyncErrorCode       String?
+  marginType              MarginType
+  marginValue             Decimal             @db.Decimal(20, 8)
+  minimumPriceMinor       BigInt              @default(0)
+  additionalCostMinor     BigInt              @default(0)
+  roundingIncrementMinor  BigInt              @default(1)
+  isActive                Boolean             @default(true)
+  effectiveFrom           DateTime            @default(now())
+  effectiveUntil          DateTime
+  updatedAt               DateTime            @updatedAt
+  tld                     Tld                 @relation(fields: [tldId], references: [id], onDelete: Restrict)
+  registrar               Registrar           @relation(fields: [registrarId], references: [id], onDelete: Restrict)
 
   @@index([tldId, registrarId, operation, periodYears, isActive])
 }

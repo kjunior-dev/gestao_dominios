@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 test('searches, quotes, persists guest cart and recovers it after login', async ({
   page,
 }) => {
@@ -26,6 +26,9 @@ test('searches, quotes, persists guest cart and recovers it after login', async 
   await page
     .getByLabel('Período de e2eshop.com', { exact: true })
     .selectOption('2');
+  await page
+    .getByRole('button', { name: 'Confirmar cotação', exact: true })
+    .click();
   await expect(page.getByText('Subtotal: 24,00 CVE')).toBeVisible();
   await page.reload();
   await expect(
@@ -82,4 +85,48 @@ test('presents occupied and unsupported domains honestly', async ({ page }) => {
     page.getByRole('heading', { name: 'Preços de domínios' }),
   ).toBeVisible();
   await expect(page.getByText('12,00 CVE').first()).toBeVisible();
+});
+
+test('keeps availability visible without a quote and blocks cart insertion', async ({
+  page,
+}) => {
+  await page.goto('/dominios/pesquisar');
+  await page.getByLabel('Nome de domínio').fill('noquote.com');
+  await page.getByRole('button', { name: 'Pesquisar domínio' }).click();
+  const result = page.getByRole('region', {
+    name: 'Resultado para noquote.com',
+    exact: true,
+  });
+  await expect(result.getByText('Disponível', { exact: true })).toBeVisible();
+  await expect(
+    result.getByText('Preço indisponível', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    result.getByRole('button', { name: 'Adicionar ao carrinho' }),
+  ).toBeDisabled();
+});
+
+test('requires acceptance of the displayed premium amount', async ({
+  page,
+}) => {
+  await page.goto('/dominios/pesquisar');
+  await page.getByLabel('Nome de domínio').fill('premium.com');
+  await page.getByRole('button', { name: 'Pesquisar domínio' }).click();
+  const result = page.getByRole('region', {
+    name: 'Resultado para premium.com',
+    exact: true,
+  });
+  await expect(result.getByText('Premium', { exact: true })).toBeVisible();
+  const add = result.getByRole('button', { name: 'Adicionar ao carrinho' });
+  await expect(add).toBeDisabled();
+  await result
+    .getByRole('checkbox', { name: /Aceito o valor premium/ })
+    .check();
+  await expect(add).toBeEnabled();
+  await add.click();
+  await expect(page.getByText('Domínio adicionado ao carrinho')).toBeVisible();
+  await page.goto('/carrinho');
+  await expect(
+    page.getByRole('heading', { name: 'premium.com' }),
+  ).toBeVisible();
 });

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 const email = 'e2e-' + Date.now() + '@example.test',
   password = 'E2E-password-secure-2026';
 test('homepage is honest and responsive', async ({ page }) => {

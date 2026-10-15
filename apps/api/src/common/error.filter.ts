@@ -16,7 +16,8 @@ export class ErrorFilter implements ExceptionFilter {
     const response = host.switchToHttp().getResponse<Response>();
     let status = 500,
       message = 'Ocorreu um erro interno',
-      fields: unknown;
+      fields: unknown,
+      issues: unknown;
     if (error instanceof CommerceError) {
       status = error.status;
       message = error.code;
@@ -28,6 +29,10 @@ export class ErrorFilter implements ExceptionFilter {
       fields =
         typeof body === 'object'
           ? (body as { fields?: unknown }).fields
+          : undefined;
+      issues =
+        typeof body === 'object'
+          ? (body as { issues?: unknown }).issues
           : undefined;
     } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
@@ -46,8 +51,13 @@ export class ErrorFilter implements ExceptionFilter {
         event: 'request.failed',
         errorType: error instanceof Error ? error.name : 'unknown',
       });
-    response
-      .status(status)
-      .json({ error: { status, message, ...(fields ? { fields } : {}) } });
+    response.status(status).json({
+      error: {
+        status,
+        message,
+        ...(fields ? { fields } : {}),
+        ...(issues ? { issues } : {}),
+      },
+    });
   }
 }

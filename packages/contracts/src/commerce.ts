@@ -43,7 +43,11 @@ export const priceSchema = z
     registrarId: z.string().uuid(),
     periodYears: z.number().int().min(1).max(10),
     supplierCurrency: currencySchema,
-    currency: currencySchema.default('CVE'),
+    currency: z.literal('CVE').default('CVE'),
+    operation: z.enum(['REGISTER', 'RENEW', 'TRANSFER']).default('REGISTER'),
+    costSource: z.enum(['MANUAL', 'API']).default('MANUAL'),
+    manualSellingPriceMinor: minorSchema.nullable().optional(),
+    changeReason: z.string().trim().min(3).max(500).optional(),
     supplierCostMinor: minorSchema,
     marginType: z.enum(['FIXED', 'MARKUP', 'GROSS_MARGIN']),
     marginValue: z.string().regex(/^\d{1,9}(?:\.\d{1,8})?$/),
@@ -57,6 +61,10 @@ export const priceSchema = z
     effectiveUntil: z.string().datetime(),
   })
   .strict()
+  .refine((v) => v.manualSellingPriceMinor == null || Boolean(v.changeReason), {
+    message: 'Indique o motivo do preço manual.',
+    path: ['changeReason'],
+  })
   .refine(
     (v) =>
       v.marginType !== 'GROSS_MARGIN' ||
@@ -83,18 +91,36 @@ export const exchangeRateSchema = z
     message: 'Escolha moedas distintas.',
     path: ['targetCurrency'],
   });
+export const supplierPriceRequestSchema = z
+  .object({
+    tldId: z.string().uuid(),
+    registrarId: z.string().uuid(),
+    periodYears: z.number().int().min(1).max(10),
+    operation: z.enum(['REGISTER', 'RENEW', 'TRANSFER']).default('REGISTER'),
+  })
+  .strict();
+export const priceStateSchema = z.object({ isActive: z.boolean() }).strict();
+const quoteAcceptance = {
+  quoteToken: z.string().min(1).max(4000).optional(),
+  acceptPremium: z.boolean().default(false),
+};
 export const cartItemSchema = z
   .object({
+    ...quoteAcceptance,
     domainName: z.string().trim().min(1).max(253),
     registrationYears: z.number().int().min(1).max(10).default(1),
   })
   .strict();
 export const cartPeriodSchema = z
-  .object({ registrationYears: z.number().int().min(1).max(10) })
+  .object({
+    ...quoteAcceptance,
+    registrationYears: z.number().int().min(1).max(10),
+  })
   .strict();
 export type AvailabilityStatus =
   'AVAILABLE' | 'REGISTERED' | 'RESERVED' | 'UNAVAILABLE' | 'UNKNOWN';
 export type CommercialQuote = {
+  quoteToken?: string;
   priceMinor: string;
   currency: (typeof currencies)[number];
   periodYears: number;
@@ -170,6 +196,17 @@ export type TldView = {
   }[];
 };
 export type PriceView = {
+  operation: 'REGISTER' | 'RENEW' | 'TRANSFER';
+  isActive: boolean;
+  costSource: 'MANUAL' | 'API';
+  manualSellingPriceMinor: string | null;
+  changeReason: string | null;
+  lastSyncAttemptAt: string | null;
+  lastSyncedAt: string | null;
+  lastSyncErrorCode: string | null;
+  minimumPriceMinor: string;
+  additionalCostMinor: string;
+  roundingIncrementMinor: string;
   id: string;
   tldId: string;
   registrarId: string;

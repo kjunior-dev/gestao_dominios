@@ -1,6 +1,6 @@
 # API REST v1
 
-Prefixo `/api/v1`. Swagger `/api/docs`, JSON `/api/openapi.json`. Pedidos JSON com schemas Zod strict partilhados e respostas tipadas. Erros: `{ error: { status, message, fields? } }`; sem stack traces. Listagens administrativas: `{ items, total, page, pageSize }`, limite 100. Pesquisa `search`, filtro de estado `status=ACTIVE|SUSPENDED`.
+Prefixo `/api/v1`. Swagger `/api/docs`, JSON `/api/openapi.json`. Pedidos JSON com schemas Zod strict partilhados e respostas tipadas. Erros: `{ error: { status, message, fields?, issues? } }`; sem stack traces. Listagens administrativas: `{ items, total, page, pageSize }`, limite 100. Pesquisa `search`, filtro de estado `status=ACTIVE|SUSPENDED`.
 
 | Método     | Caminho (sem prefixo)                    | Acesso                                      |
 | ---------- | ---------------------------------------- | ------------------------------------------- |
@@ -74,3 +74,9 @@ Visitantes inicializam o carrinho via GET antes de mutações e usam X-Cart-CSRF
 Swagger descreve schemas dos pedidos. Webhooks são autenticados por assinatura e timestamp, sem cookie/CSRF; os restantes pedidos de alteração mantêm Origin/CSRF e permissões. O cliente nunca pode fornecer preços, hashes de verificação, estado de pagamento ou flags de produção.
 
 Dados fiscais por organização: GET /billing?organizationId=UUID e PATCH /billing?organizationId=UUID. Linhas de encomenda: GET /orders/:orderId/items. Pré-visualização HTML/texto de templates: /admin/notificacoes/templates (desenvolvimento, SUPER_ADMIN). Reembolsos do cliente também constam do detalhe autorizado da encomenda.
+
+## Erros de validação no checkout
+
+Respostas HTTP 400 mantêm `error.fields` agrupado por campo de topo para compatibilidade e acrescentam `error.issues`: uma lista de `{ path: (string | number)[], message: string }`. Por exemplo, `path: ["nameservers", 0]` identifica Nameserver 1 e `["billing", "postalCode"]` identifica o código postal de faturação. As mensagens de `issues` são em português e não incluem os valores submetidos nem metadados do validador.
+
+O cliente HTTP preserva ambos os formatos em `ApiError`. O checkout valida contacto e pedido completo antes de criar o contacto, mostra resumo persistente e mensagens junto dos campos, foca o primeiro erro e conserva os dados preenchidos. Rejeições de `/domain-contacts` e de `/checkout` têm mensagens distintas; erros em referências internas são apresentados com instruções acionáveis. As regras de validação e de autorização do servidor continuam obrigatórias.

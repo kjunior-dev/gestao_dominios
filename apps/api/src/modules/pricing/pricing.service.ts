@@ -1,3 +1,7 @@
+import { PricingError } from './pricing-error';
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { ConflictException } from '@nestjs/common';
+import { z } from 'zod/v3';
 import { ManualExchangeRateProvider } from './manual-exchange-rate.provider';
 import {
   Inject,
@@ -23,8 +27,20 @@ export function calculatePrice(
   >,
 ): string {
   const D = Prisma.Decimal;
-  let value = new D(cost).mul(rate).add(policy.additionalCostMinor.toString());
+  const acquisition = new D(cost),
+    fx = new D(rate);
+  if (
+    !acquisition.isFinite() ||
+    acquisition.isNegative() ||
+    !acquisition.isInteger() ||
+    !fx.isFinite() ||
+    !fx.gt(0)
+  )
+    throw new PricingError('INVALID_PRICE_INPUT');
+  let value = acquisition.mul(fx).add(policy.additionalCostMinor.toString());
   const margin = new D(policy.marginValue.toString());
+  if (!margin.isFinite() || margin.isNegative())
+    throw new PricingError('INVALID_MARGIN');
   if (policy.marginType === 'FIXED') value = value.add(margin.mul(100));
   else if (policy.marginType === 'MARKUP')
     value = value.mul(new D(1).add(margin.div(100)));
@@ -42,6 +58,18 @@ export function calculatePrice(
     throw new UnprocessableEntityException('Preço excede o limite');
   return value.toFixed(0);
 }
+const signedQuoteSchema = z
+  .object({
+    domainName: z.string(),
+    registrarCode: z.string(),
+    isPremium: z.boolean(),
+    priceMinor: z.string().regex(/^\d{1,15}$/),
+    currency: z.literal('CVE'),
+    periodYears: z.number().int().min(1).max(10),
+    expiresAt: z.string().datetime(),
+    priceVersion: z.string().uuid(),
+  })
+  .strict();
 @Injectable()
 export class PricingService {
   constructor(
@@ -58,6 +86,7 @@ export class PricingService {
     registrarId: string,
     periodYears: number,
     cost?: SupplierMoney,
+    isPremium = false,
   ) {
     const now = new Date();
     const policy = await this.db.tldPrice.findFirst({
@@ -73,10 +102,25 @@ export class PricingService {
       },
       orderBy: { effectiveFrom: 'desc' },
     });
-    if (!policy)
-      throw new UnprocessableEntityException(
-        'Preço comercial válido indisponível',
+    if (!policy) {
+      const previous = await this.db.tldPrice.findFirst({
+        where: {
+          tldId,
+          registrarId,
+          periodYears,
+          operation: 'REGISTER',
+          currency: 'CVE',
+        },
+        orderBy: { effectiveFrom: 'desc' },
+      });
+      throw new PricingError(
+        previous && previous.effectiveUntil <= now
+          ? 'PRICE_POLICY_EXPIRED'
+          : previous?.isActive === false
+            ? 'PRICE_POLICY_DISABLED'
+            : 'PRICE_POLICY_UNAVAILABLE',
       );
+    }
     const supplier = cost || {
       minor: policy.supplierCostMinor.toString(),
       currency: policy.supplierCurrency,
@@ -90,7 +134,10 @@ export class PricingService {
       ),
     );
     const quote: CommercialQuote = {
-      priceMinor: calculatePrice(supplier.minor, fx.rate, policy),
+      priceMinor:
+        !isPremium && policy.manualSellingPriceMinor != null
+          ? policy.manualSellingPriceMinor.toString()
+          : calculatePrice(supplier.minor, fx.rate, policy),
       currency: 'CVE',
       periodYears,
       expiresAt: expiresAt.toISOString(),
@@ -98,6 +145,9 @@ export class PricingService {
     };
     const snapshot = {
       ...quote,
+      manualSellingPriceMinor: !isPremium
+        ? (policy.manualSellingPriceMinor?.toString() ?? null)
+        : null,
       supplierCostMinor: supplier.minor,
       supplierCurrency: supplier.currency,
       exchangeRate: fx.rate,
@@ -108,6 +158,71 @@ export class PricingService {
       minimumPriceMinor: policy.minimumPriceMinor.toString(),
       roundingIncrementMinor: policy.roundingIncrementMinor.toString(),
     };
+    if (expiresAt <= new Date()) throw new PricingError('QUOTE_EXPIRED');
     return { quote, snapshot };
+  }
+  signQuote(
+    domainName: string,
+    registrarCode: string,
+    isPremium: boolean,
+    quote: CommercialQuote,
+  ) {
+    const value = {
+      priceMinor: quote.priceMinor,
+      currency: quote.currency,
+      periodYears: quote.periodYears,
+      expiresAt: quote.expiresAt,
+      priceVersion: quote.priceVersion,
+    };
+    const payload = Buffer.from(
+      JSON.stringify({ domainName, registrarCode, isPremium, ...value }),
+    ).toString('base64url');
+    return payload + '.' + this.signature(payload);
+  }
+  private signature(payload: string) {
+    return createHmac(
+      'sha256',
+      Buffer.from(this.runtime.env.TOTP_ENCRYPTION_KEY, 'hex'),
+    )
+      .update('devtrust:domain-quote:v1:' + payload)
+      .digest('base64url');
+  }
+  verifyQuote(
+    token: string,
+    domainName: string,
+    registrarCode: string,
+    isPremium: boolean,
+    quote: CommercialQuote,
+  ) {
+    try {
+      const [payload, mac, extra] = token.split('.');
+      if (!payload || !mac || extra) throw new Error();
+      const actual = Buffer.from(mac),
+        expected = Buffer.from(this.signature(payload));
+      if (
+        actual.length !== expected.length ||
+        !timingSafeEqual(actual, expected)
+      )
+        throw new Error();
+      const signed = signedQuoteSchema.parse(
+        JSON.parse(Buffer.from(payload, 'base64url').toString()),
+      );
+      if (new Date(signed.expiresAt) <= new Date()) throw new Error();
+      if (
+        signed.domainName !== domainName ||
+        signed.registrarCode !== registrarCode ||
+        signed.isPremium !== isPremium ||
+        signed.priceMinor !== quote.priceMinor ||
+        signed.currency !== quote.currency ||
+        signed.periodYears !== quote.periodYears ||
+        signed.priceVersion !== quote.priceVersion
+      )
+        throw new Error();
+    } catch {
+      throw new ConflictException({
+        code: 'QUOTE_CHANGED_OR_EXPIRED',
+        message: 'Cotação alterada ou expirada. Pesquise e confirme novamente.',
+      });
+    }
   }
 }

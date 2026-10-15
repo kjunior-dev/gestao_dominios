@@ -10,9 +10,19 @@ export const domainContactSchema = z
       .or(z.literal(''))
       .transform((v) => v || undefined)
       .optional(),
-    email: z.string().email().max(254),
-    phone: z.string().regex(/^\d{5,15}$/),
-    phoneCountryCode: z.string().regex(/^\+\d{1,4}$/),
+    email: z.string().email('Introduza um email válido.').max(254),
+    phone: z
+      .string()
+      .regex(
+        /^\d{5,15}$/,
+        'Introduza entre 5 e 15 algarismos, sem espaços nem indicativo.',
+      ),
+    phoneCountryCode: z
+      .string()
+      .regex(
+        /^\+\d{1,4}$/,
+        'Use + seguido de 1 a 4 algarismos, por exemplo +238.',
+      ),
     address: text,
     addressNumber: z.string().trim().min(1).max(20),
     city: text,
@@ -21,7 +31,9 @@ export const domainContactSchema = z
       .transform((v) => v || undefined)
       .optional(),
     postalCode: z.string().trim().min(1).max(20),
-    countryCode: z.string().regex(/^[A-Z]{2}$/),
+    countryCode: z
+      .string()
+      .regex(/^[A-Z]{2}$/, 'Use duas letras maiúsculas, por exemplo CV.'),
     contactType: z.enum(['OWNER', 'ADMIN', 'TECH', 'BILLING']).default('OWNER'),
   })
   .strict();
@@ -32,7 +44,9 @@ export const billingSchema = z
     address: text,
     city: text,
     postalCode: z.string().min(1).max(20),
-    countryCode: z.string().regex(/^[A-Z]{2}$/),
+    countryCode: z
+      .string()
+      .regex(/^[A-Z]{2}$/, 'Use duas letras maiúsculas, por exemplo CV.'),
   })
   .strict();
 export const checkoutSchema = z
@@ -46,6 +60,7 @@ export const checkoutSchema = z
           .toLowerCase()
           .regex(
             /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/,
+            'Introduza um nome DNS válido, por exemplo ns1.seufornecedor.com, sem http:// ou caminhos.',
           ),
       )
       .min(2)

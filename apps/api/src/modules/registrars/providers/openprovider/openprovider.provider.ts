@@ -97,11 +97,14 @@ export class OpenproviderProvider implements RegistrarProvider {
   }
 
   async getTldPricing(request: PricingRequest): Promise<RegistrarPricing> {
+    const operation = request.operation || 'REGISTER';
     if (request.name) {
       const query = new URLSearchParams({
         'domain.name': request.name,
         'domain.extension': request.extension,
-        operation: 'create',
+        operation: { REGISTER: 'create', RENEW: 'renew', TRANSFER: 'transfer' }[
+          operation
+        ],
         period: String(request.periodYears),
         ...(request.idnScript
           ? { 'additional_data.idn_script': request.idnScript }
@@ -122,7 +125,12 @@ export class OpenproviderProvider implements RegistrarProvider {
     }
     const schema = z.object({
       min_period: z.coerce.number().int(),
-      prices: z.object({ create_price: z.object({ reseller: moneySchema }) }),
+      prices: z.object({
+        create_price: z.object({ reseller: moneySchema }),
+        reseller_price: z.object({ reseller: moneySchema }).optional(),
+        renew_price: z.object({ reseller: moneySchema }).optional(),
+        transfer_price: z.object({ reseller: moneySchema }).optional(),
+      }),
     });
     const parsed = schema.safeParse(
       await this.call(
@@ -133,7 +141,15 @@ export class OpenproviderProvider implements RegistrarProvider {
     if (!parsed.success) throw new RegistrarError('PROVIDER_INVALID_RESPONSE');
     if (request.periodYears !== parsed.data.min_period)
       throw new RegistrarError('CAPABILITY_UNSUPPORTED');
-    const price = parsed.data.prices.create_price.reseller;
+    const prices = parsed.data.prices;
+    const group =
+      operation === 'REGISTER'
+        ? prices.reseller_price || prices.create_price
+        : operation === 'RENEW'
+          ? prices.renew_price
+          : prices.transfer_price;
+    if (!group) throw new RegistrarError('CAPABILITY_UNSUPPORTED');
+    const price = group.reseller;
     return {
       cost: supplierMoney(price.price, price.currency),
       isPremium: false,
